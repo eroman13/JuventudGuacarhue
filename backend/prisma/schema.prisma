@@ -1,0 +1,399 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTENTICACIÓN Y USUARIOS
+// ============================================
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String
+  nombre        String
+  apellido      String
+  telefono      String?
+  avatar        String?
+  rol           UserRole   @default(EDITOR)
+  estado        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  // Relaciones
+  noticias      Noticia[]
+  jugadores     Jugador[]
+  partidos      Partido[]
+  galeria       Foto[]
+  videos        Video[]
+  productos     Producto[]
+
+  @@index([email])
+  @@index([rol])
+}
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  MODERADOR
+  EDITOR
+  VIEWER
+}
+
+// ============================================
+// NOTICIAS Y CONTENIDO
+// ============================================
+
+model Noticia {
+  id            String     @id @default(cuid())
+  titulo        String
+  slug          String     @unique
+  contenido     String
+  resumen       String
+  imagen        String?
+  estado        NoticiasEstado @default(BORRADOR)
+  fechaPublicacion DateTime?
+  creador       User       @relation(fields: [creadorId], references: [id], onDelete: Cascade)
+  creadorId     String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  // Relaciones
+  comentarios   Comentario[]
+
+  @@index([creadorId])
+  @@index([estado])
+  @@index([fechaPublicacion])
+}
+
+enum NoticiasEstado {
+  BORRADOR
+  PENDIENTE_REVISION
+  PUBLICADO
+  ARCHIVADO
+}
+
+model Comentario {
+  id        String   @id @default(cuid())
+  texto     String
+  noticia   Noticia  @relation(fields: [noticiaId], references: [id], onDelete: Cascade)
+  noticiaId String
+  nombre    String
+  email     String
+  aprobado  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([noticiaId])
+  @@index([aprobado])
+}
+
+// ============================================
+// JUGADORES Y EQUIPO
+// ============================================
+
+model Jugador {
+  id            String   @id @default(cuid())
+  nombre        String
+  apellido      String
+  numero        Int
+  posicion      String
+  nacionalidad  String?
+  fechaNacimiento DateTime?
+  foto          String?
+  estado        Boolean  @default(true)
+  creador       User     @relation(fields: [creadorId], references: [id], onDelete: Cascade)
+  creadorId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relaciones
+  estadisticas  EstadisticasJugador[]
+  goles         GolPartido[]
+
+  @@index([creadorId])
+  @@index([numero])
+  @@unique([numero])
+}
+
+model EstadisticasJugador {
+  id        String   @id @default(cuid())
+  jugador   Jugador  @relation(fields: [jugadorId], references: [id], onDelete: Cascade)
+  jugadorId String
+  goles     Int      @default(0)
+  asistencias Int @default(0)
+  tarjetasAmarillas Int @default(0)
+  tarjetasRojas Int @default(0)
+  partidosJugados Int @default(0)
+  temporada String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jugadorId, temporada])
+  @@index([jugadorId])
+}
+
+// ============================================
+// PARTIDOS
+// ============================================
+
+model Partido {
+  id          String   @id @default(cuid())
+  nombre      String   // "Juventud Guacarhue vs Enemigo"
+  fechaPartido DateTime
+  lugarPartido String
+  estado      PartidoEstado @default(PROXIMO)
+  equipoLocal String   // "Juventud Guacarhue"
+  equipoVisitante String
+  golesLocal  Int?     @default(0)
+  golesVisitante Int?  @default(0)
+  arbitro     String?
+  publico     Int?
+  description String?
+  creador     User     @relation(fields: [creadorId], references: [id], onDelete: Cascade)
+  creadorId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  golesPartido GolPartido[]
+
+  @@index([creadorId])
+  @@index([fechaPartido])
+  @@index([estado])
+}
+
+enum PartidoEstado {
+  PROXIMO
+  JUGANDO
+  FINALIZADO
+  CANCELADO
+}
+
+model GolPartido {
+  id        String   @id @default(cuid())
+  partido   Partido  @relation(fields: [partidoId], references: [id], onDelete: Cascade)
+  partidoId String
+  jugador   Jugador  @relation(fields: [jugadorId], references: [id], onDelete: SetNull)
+  jugadorId String?
+  minuto    Int
+  tipo      TipoGol  @default(GOL)
+  createdAt DateTime @default(now())
+
+  @@index([partidoId])
+  @@index([jugadorId])
+}
+
+enum TipoGol {
+  GOL
+  AUTOGOAL
+  PENAL
+}
+
+// ============================================
+// GALERÍA Y MULTIMEDIA
+// ============================================
+
+model Foto {
+  id        String   @id @default(cuid())
+  url       String
+  titulo    String
+  descripcion String?
+  categoria FotoCategorias
+  creador   User     @relation(fields: [creadorId], references: [id], onDelete: Cascade)
+  creadorId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creadorId])
+  @@index([categoria])
+}
+
+enum FotoCategorias {
+  PARTIDO
+  ENTRENAMIENTO
+  EVENTO
+  EQUIPO
+  GALERIA
+  OTROS
+}
+
+model Video {
+  id        String   @id @default(cuid())
+  titulo    String
+  descripcion String?
+  urlVideo  String   // URL de YouTube, Vimeo, etc
+  thumbnail String?
+  categoria VideoCategorias
+  estado    Boolean  @default(true)
+  creador   User     @relation(fields: [creadorId], references: [id], onDelete: Cascade)
+  creadorId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creadorId])
+  @@index([categoria])
+}
+
+enum VideoCategorias {
+  PARTIDO
+  ENTRENAMIENTO
+  TUTORIAL
+  NOTICIA
+  ENTREVISTA
+  OTROS
+}
+
+// ============================================
+// TIENDA
+// ============================================
+
+model Producto {
+  id          String   @id @default(cuid())
+  nombre      String
+  slug        String   @unique
+  descripcion String
+  precio      Float
+  imagen      String?
+  stock       Int      @default(0)
+  estado      Boolean  @default(true)
+  creador     User     @relation(fields: [creadorId], references: [id], onDelete: Cascade)
+  creadorId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  pedidos     ItemPedido[]
+
+  @@index([creadorId])
+  @@index([estado])
+}
+
+model Pedido {
+  id          String   @id @default(cuid())
+  numeroOrden String   @unique
+  estado      EstadoPedido @default(PENDIENTE)
+  total       Float
+  nombreCliente String
+  emailCliente  String
+  telefonoCliente String
+  direccion   String
+  ciudad      String
+  region      String
+  codigoPostal String
+  notasEspeciales String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  items       ItemPedido[]
+
+  @@index([estado])
+  @@index([emailCliente])
+}
+
+model ItemPedido {
+  id        String   @id @default(cuid())
+  pedido    Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  pedidoId  String
+  producto  Producto @relation(fields: [productoId], references: [id], onDelete: Restrict)
+  productoId String
+  cantidad  Int
+  precio    Float
+  subtotal  Float
+
+  @@index([pedidoId])
+  @@index([productoId])
+}
+
+enum EstadoPedido {
+  PENDIENTE
+  CONFIRMADO
+  ENVIADO
+  ENTREGADO
+  CANCELADO
+  DEVUELTO
+}
+
+// ============================================
+// ABONADOS
+// ============================================
+
+model Abonado {
+  id          String   @id @default(cuid())
+  nombre      String
+  apellido    String
+  email       String   @unique
+  telefono    String
+  tipoAbono   TipoAbono
+  fechaInicio DateTime
+  fechaVencimiento DateTime
+  estado      EstadoAbono @default(ACTIVO)
+  precioAbono Float
+  comprobante String?
+  numeroComprobante String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([estado])
+  @@index([tipoAbono])
+}
+
+enum TipoAbono {
+  ANUAL
+  SEMESTRAL
+  TRIMESTRAL
+  MENSUAL
+}
+
+enum EstadoAbono {
+  ACTIVO
+  VENCIDO
+  CANCELADO
+  SUSPENDIDO
+}
+
+// ============================================
+// INFORMACIÓN DEL CLUB
+// ============================================
+
+model ConfiguracionClub {
+  id          String   @id @default(cuid())
+  nombreClub  String   @default("Juventud Guacarhue")
+  descripcion String?
+  logoUrl     String?
+  bannerUrl   String?
+  email       String
+  telefono    String
+  direccion   String
+  ciudad      String
+  region      String
+  codigoPostal String
+  paginaWeb   String?
+  instagram   String?
+  facebook    String?
+  youtube     String?
+  twitter     String?
+  tiktok      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Pagina {
+  id        String   @id @default(cuid())
+  titulo    String
+  slug      String   @unique
+  contenido String
+  estado    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}

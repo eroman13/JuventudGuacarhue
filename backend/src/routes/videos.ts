@@ -3,11 +3,11 @@ import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
   res.json({ message: 'Obtener videos', data: [] });
 });
 
-router.post('/', authMiddleware, requireRole('EDITOR', 'ADMIN', 'SUPERADMIN'), async (req, res) => {
+router.post('/', authMiddleware, requireRole('EDITOR', 'ADMIN', 'SUPERADMIN'), async (_req, res) => {
   res.status(201).json({ message: 'Video agregado' });
 });
 

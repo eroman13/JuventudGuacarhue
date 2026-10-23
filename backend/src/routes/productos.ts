@@ -3,11 +3,11 @@ import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
   res.json({ message: 'Obtener productos', data: [] });
 });
 
-router.post('/', authMiddleware, requireRole('EDITOR', 'ADMIN', 'SUPERADMIN'), async (req, res) => {
+router.post('/', authMiddleware, requireRole('EDITOR', 'ADMIN', 'SUPERADMIN'), async (_req, res) => {
   res.status(201).json({ message: 'Producto creado' });
 });
 
@@ -15,11 +15,11 @@ router.get('/:id', async (req, res) => {
   res.json({ message: 'Obtener producto', id: req.params.id });
 });
 
-router.put('/:id', authMiddleware, requireRole('EDITOR', 'ADMIN', 'SUPERADMIN'), async (req, res) => {
+router.put('/:id', authMiddleware, requireRole('EDITOR', 'ADMIN', 'SUPERADMIN'), async (_req, res) => {
   res.json({ message: 'Producto actualizado', id: req.params.id });
 });
 
-router.delete('/:id', authMiddleware, requireRole('ADMIN', 'SUPERADMIN'), async (req, res) => {
+router.delete('/:id', authMiddleware, requireRole('ADMIN', 'SUPERADMIN'), async (_req, res) => {
   res.json({ message: 'Producto eliminado', id: req.params.id });
 });
 

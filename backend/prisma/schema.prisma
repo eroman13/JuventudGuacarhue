@@ -180,7 +180,7 @@ model GolPartido {
   id        String   @id @default(cuid())
   partido   Partido  @relation(fields: [partidoId], references: [id], onDelete: Cascade)
   partidoId String
-  jugador   Jugador  @relation(fields: [jugadorId], references: [id], onDelete: SetNull)
+  jugador   Jugador? @relation(fields: [jugadorId], references: [id], onDelete: SetNull)
   jugadorId String?
   minuto    Int
   tipo      TipoGol  @default(GOL)

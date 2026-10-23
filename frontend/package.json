@@ -17,18 +17,19 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
-    "@tailwindcss/forms": "^0.5.9",
-    "@types/node": "^22.20.4",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@typescript-eslint/eslint-plugin": "^8.70.1",
-    "@typescript-eslint/parser": "^8.70.1",
-    "@vitejs/plugin-react": "^4.3.3",
-    "autoprefixer": "^10.4.20",
+    "@tailwindcss/forms": "^0.5.7",
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
     "eslint": "^8.56.0",
-    "postcss": "^8.4.40",
-    "tailwindcss": "^3.4.12",
-    "typescript": "^5.7.2",
-    "vite": "^5.4.10"
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.1",
+    "terser": "^5.51.2",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
   }
 }

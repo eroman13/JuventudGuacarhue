@@ -1,14 +1,13 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
+    container_name: juventud-postgres
     environment:
       POSTGRES_USER: juventud
       POSTGRES_PASSWORD: desarrollo123
       POSTGRES_DB: juventud_guacarhue
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,37 +15,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  backend:
-    build: ./backend
-    environment:
-      DATABASE_URL: postgresql://juventud:desarrollo123@postgres:5432/juventud_guacarhue
-      PORT: 3000
-      JWT_SECRET: desarrollo-secret-key
-      NODE_ENV: development
-      CORS_ORIGIN: http://localhost:5173
-    ports:
-      - "3000:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./backend/src:/app/src
-    command: npm run dev
+    networks:
+      - juventud-network
 
   redis:
     image: redis:7-alpine
+    container_name: juventud-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - juventud-network
 
 volumes:
   postgres_data:
 
-# Para usar: docker-compose up
+networks:
+  juventud-network:
+    driver: bridge
+
+# Para usar: docker-compose up -d
 # Para detener: docker-compose down
 # Para ver logs: docker-compose logs -f
+# Para conectarse a BD: docker exec -it juventud-postgres psql -U juventud -d juventud_guacarhue

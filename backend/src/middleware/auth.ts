@@ -22,7 +22,7 @@ export const authMiddleware = (req: RequestWithAuth, res: Response, next: NextFu
       rol: decoded.rol,
     };
 
-    next();
+    return next();
   } catch (error) {
     return res.status(401).json({
       error: { status: 401, message: 'Token inválido' }
@@ -44,7 +44,7 @@ export const requireRole = (...roles: UserRole[]) => {
       });
     }
 
-    next();
+    return next();
   };
 };
 
@@ -54,5 +54,5 @@ export const requireAuth = (req: RequestWithAuth, res: Response, next: NextFunct
       error: { status: 401, message: 'No autenticado' }
     });
   }
-  next();
+  return next();
 };

@@ -1,4 +1,5 @@
 import { UserRole } from '@prisma/client';
+import { Request } from 'express';
 
 export interface AuthPayload {
   id: string;
@@ -14,7 +15,7 @@ export interface JWTPayload {
   exp?: number;
 }
 
-export interface RequestWithAuth extends Express.Request {
+export interface RequestWithAuth extends Request {
   user?: AuthPayload;
 }
 

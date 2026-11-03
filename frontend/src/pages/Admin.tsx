@@ -1,205 +1,228 @@
-import { useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { ROLES_QUE_EDITAN, useAuth } from '../hooks/useAuth'
+import { ADMIN_TABS, type AdminTab } from '../components/admin/tabs'
+import { Badge, type Notify } from '../components/admin/ui'
+import Dashboard from '../components/admin/Dashboard'
+import NoticiasManager from '../components/admin/NoticiasManager'
+import JugadoresManager from '../components/admin/JugadoresManager'
+import PartidosManager from '../components/admin/PartidosManager'
+import GaleriaManager from '../components/admin/GaleriaManager'
+import TiendaManager from '../components/admin/TiendaManager'
+import VideosManager from '../components/admin/VideosManager'
+import PedidosManager from '../components/admin/PedidosManager'
+import AbonadosManager from '../components/admin/AbonadosManager'
+import ConfigPanel from '../components/admin/ConfigPanel'
+import RespaldoPanel from '../components/admin/RespaldoPanel'
+
+const TAB_DESCRIPTIONS: Record<AdminTab, string> = {
+  dashboard: 'Resumen general',
+  noticias: 'Comunicados y novedades',
+  jugadores: 'Planteles y fichas',
+  partidos: 'Calendario y resultados',
+  galeria: 'Fotos del club',
+  productos: 'Tienda oficial',
+  videos: 'Multimedia y transmisiones',
+  pedidos: 'Ventas y despachos',
+  abonados: 'Membresias del club',
+  config: 'Ajustes del sitio',
+  respaldo: 'Exportar e importar datos',
+}
+
+interface ToastState {
+  message: string
+  tone: 'success' | 'error'
+}
 
 export default function Admin() {
-  const { user, isLoggedIn, logout } = useAuth()
+  const { user, isLoggedIn, isReady, isDemoMode, logout, reconectar } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
+  const [toast, setToast] = useState<ToastState | null>(null)
+  const [reconectando, setReconectando] = useState(false)
+  const timerRef = useRef<number | null>(null)
 
-  if (!isLoggedIn) {
-    navigate('/login')
-    return null
+  const notify = useCallback<Notify>((message, tone = 'success') => {
+    setToast({ message, tone })
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current)
+    }
+    timerRef.current = window.setTimeout(() => setToast(null), 4200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
+
+  const canManage = user ? ROLES_QUE_EDITAN.includes(user.rol) : false
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  const handleReconectar = async () => {
+    setReconectando(true)
+    const conectado = await reconectar()
+    setReconectando(false)
+    if (!conectado) {
+      notify('Seguimos sin conexión con el servidor. Revisa que el backend esté corriendo.', 'error')
+    }
+  }
+
+  if (!isReady) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-slate-950 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+        Cargando panel...
+      </div>
+    )
+  }
+
+  if (!isLoggedIn || !user) {
+    return <Navigate to="/login" replace state={{ from: '/admin' }} />
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-blue-600 text-white p-6">
-          <h2 className="text-2xl font-bold mb-8">Panel Admin</h2>
-          <nav className="space-y-4">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`w-full text-left px-4 py-2 rounded ${
-                activeTab === 'dashboard' ? 'bg-blue-700' : 'hover:bg-blue-700'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setActiveTab('noticias')}
-              className={`w-full text-left px-4 py-2 rounded ${
-                activeTab === 'noticias' ? 'bg-blue-700' : 'hover:bg-blue-700'
-              }`}
-            >
-              Noticias
-            </button>
-            <button
-              onClick={() => setActiveTab('jugadores')}
-              className={`w-full text-left px-4 py-2 rounded ${
-                activeTab === 'jugadores' ? 'bg-blue-700' : 'hover:bg-blue-700'
-              }`}
-            >
-              Jugadores
-            </button>
-            <button
-              onClick={() => setActiveTab('partidos')}
-              className={`w-full text-left px-4 py-2 rounded ${
-                activeTab === 'partidos' ? 'bg-blue-700' : 'hover:bg-blue-700'
-              }`}
-            >
-              Partidos
-            </button>
-            <button
-              onClick={() => setActiveTab('galeria')}
-              className={`w-full text-left px-4 py-2 rounded ${
-                activeTab === 'galeria' ? 'bg-blue-700' : 'hover:bg-blue-700'
-              }`}
-            >
-              Galería
-            </button>
-            <button
-              onClick={() => setActiveTab('productos')}
-              className={`w-full text-left px-4 py-2 rounded ${
-                activeTab === 'productos' ? 'bg-blue-700' : 'hover:bg-blue-700'
-              }`}
-            >
-              Productos
-            </button>
-            <button
-              onClick={() => {
-                logout()
-                navigate('/')
-              }}
-              className="w-full text-left px-4 py-2 rounded hover:bg-red-600 mt-8"
-            >
-              Cerrar Sesión
-            </button>
-          </nav>
-        </aside>
+    <div className="min-h-screen bg-slate-100">
+      <header className="bg-slate-950 text-white">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-blue-300">
+              Juventud Guacarhue
+            </p>
+            <h1 className="mt-1 text-xl font-bold uppercase tracking-[0.05em] sm:text-2xl">
+              Panel de administracion
+            </h1>
+          </div>
 
-        {/* Main Content */}
-        <main className="flex-1">
-          {/* Top Bar */}
-          <div className="bg-white shadow">
-            <div className="px-8 py-4 flex justify-between items-center">
-              <h1 className="text-2xl font-bold">Administración</h1>
-              <div className="text-sm">
-                <p>Bienvenido, <strong>{user?.nombre}</strong></p>
-                <p className="text-gray-500">Rol: {user?.rol}</p>
-              </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-right">
+              <p className="text-sm font-semibold leading-tight">
+                {user.nombre} {user.apellido}
+              </p>
+              <p className="text-[11px] text-slate-400">{user.email}</p>
             </div>
+            <Badge tone={canManage ? 'green' : 'amber'}>{user.rol}</Badge>
+            <Link
+              to="/"
+              className="rounded-lg border border-white/20 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-200 transition hover:border-white/40 hover:text-white"
+            >
+              Ver sitio
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-lg bg-rose-600 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-rose-700"
+            >
+              Cerrar sesion
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {isDemoMode && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
+            <p className="text-xs font-semibold text-amber-800">
+              Sesion de demostracion: el backend no esta disponible. Los contenidos se guardan solo
+              en este navegador.
+            </p>
+            <button
+              type="button"
+              onClick={handleReconectar}
+              disabled={reconectando}
+              className="rounded-md bg-amber-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {reconectando ? 'Reintentando...' : 'Reintentar conexion'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row">
+        <nav aria-label="Secciones del panel" className="lg:w-60 lg:flex-shrink-0">
+          <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+            {ADMIN_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.08em] transition ${
+                  activeTab === tab.id
+                    ? 'bg-blue-700 text-white'
+                    : 'border border-slate-200 bg-white text-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {/* Content Area */}
-          <div className="p-8">
-            {activeTab === 'dashboard' && (
-              <div>
-                <h2 className="text-3xl font-bold mb-8">Dashboard</h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <div className="text-3xl font-bold text-blue-600">0</div>
-                    <p className="text-gray-600 mt-2">Noticias</p>
-                  </div>
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <div className="text-3xl font-bold text-green-600">0</div>
-                    <p className="text-gray-600 mt-2">Jugadores</p>
-                  </div>
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <div className="text-3xl font-bold text-purple-600">0</div>
-                    <p className="text-gray-600 mt-2">Partidos</p>
-                  </div>
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <div className="text-3xl font-bold text-orange-600">0</div>
-                    <p className="text-gray-600 mt-2">Productos</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'noticias' && (
-              <div>
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold">Gestión de Noticias</h2>
-                  <button className="btn-primary bg-blue-600 text-white">
-                    + Nueva Noticia
-                  </button>
-                </div>
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6">
-                    <p className="text-gray-500">No hay noticias. Crea una para comenzar.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'jugadores' && (
-              <div>
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold">Gestión de Jugadores</h2>
-                  <button className="btn-primary bg-blue-600 text-white">
-                    + Nuevo Jugador
-                  </button>
-                </div>
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6">
-                    <p className="text-gray-500">No hay jugadores. Agrega uno para comenzar.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'partidos' && (
-              <div>
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold">Gestión de Partidos</h2>
-                  <button className="btn-primary bg-blue-600 text-white">
-                    + Nuevo Partido
-                  </button>
-                </div>
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6">
-                    <p className="text-gray-500">No hay partidos. Crea uno para comenzar.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'galeria' && (
-              <div>
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold">Gestión de Galería</h2>
-                  <button className="btn-primary bg-blue-600 text-white">
-                    + Subir Fotos
-                  </button>
-                </div>
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6">
-                    <p className="text-gray-500">No hay fotos. Sube algunas para comenzar.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'productos' && (
-              <div>
-                <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold">Gestión de Productos</h2>
-                  <button className="btn-primary bg-blue-600 text-white">
-                    + Nuevo Producto
-                  </button>
-                </div>
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-6">
-                    <p className="text-gray-500">No hay productos. Crea uno para comenzar.</p>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-4 lg:block">
+            {ADMIN_TABS.map((tab) => {
+              const activo = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  aria-current={activo ? 'page' : undefined}
+                  className={`mb-1 flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition ${
+                    activo ? 'bg-blue-700 text-white' : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-xs font-bold uppercase tracking-[0.08em]">{tab.label}</span>
+                  <span
+                    className={`text-[10px] ${activo ? 'text-blue-100' : 'text-slate-400'}`}
+                  >
+                    {TAB_DESCRIPTIONS[tab.id]}
+                  </span>
+                </button>
+              )
+            })}
           </div>
+        </nav>
+
+        <main className="min-w-0 flex-1">
+          {activeTab === 'dashboard' && (
+            <Dashboard canManage={canManage} onNavigate={setActiveTab} />
+          )}
+          {activeTab === 'noticias' && <NoticiasManager canManage={canManage} notify={notify} />}
+          {activeTab === 'jugadores' && <JugadoresManager canManage={canManage} notify={notify} />}
+          {activeTab === 'partidos' && <PartidosManager canManage={canManage} notify={notify} />}
+          {activeTab === 'galeria' && <GaleriaManager canManage={canManage} notify={notify} />}
+          {activeTab === 'productos' && <TiendaManager canManage={canManage} notify={notify} />}
+          {activeTab === 'videos' && <VideosManager canManage={canManage} notify={notify} />}
+          {activeTab === 'pedidos' && <PedidosManager canManage={canManage} notify={notify} />}
+          {activeTab === 'abonados' && <AbonadosManager canManage={canManage} notify={notify} />}
+          {activeTab === 'config' && <ConfigPanel />}
+          {activeTab === 'respaldo' && <RespaldoPanel canManage={canManage} notify={notify} />}
         </main>
       </div>
+
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-4 right-4 z-[90] flex w-[min(22rem,calc(100vw-2rem))] items-start gap-3 rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-xl ${
+            toast.tone === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}
+        >
+          <span className="flex-1">{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Cerrar notificacion"
+            className="text-white/80 transition hover:text-white"
+          >
+            x
+          </button>
+        </div>
+      )}
     </div>
   )
 }

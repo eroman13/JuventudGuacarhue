@@ -47,7 +47,7 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: JWT_EXPIRATION }
     );
 
-    res.json({
+    return res.json({
       token,
       user: {
         id: user.id,
@@ -59,7 +59,7 @@ export const login = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error en login:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: { status: 500, message: 'Error en login' }
     });
   }
@@ -103,7 +103,7 @@ export const register = async (req: Request, res: Response) => {
       { expiresIn: JWT_EXPIRATION }
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       token,
       user: {
         id: user.id,
@@ -115,7 +115,7 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error en registro:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: { status: 500, message: 'Error en registro' }
     });
   }
@@ -150,10 +150,10 @@ export const me = async (req: Request, res: Response) => {
       });
     }
 
-    res.json(user);
+    return res.json(user);
   } catch (error) {
     console.error('Error en me:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: { status: 500, message: 'Error al obtener usuario' }
     });
   }

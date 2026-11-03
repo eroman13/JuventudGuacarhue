@@ -133,6 +133,23 @@ La aplicación estará disponible en `http://localhost:5173`
 - `POST /api/galeria` - Subir foto
 - `DELETE /api/galeria/:id` - Eliminar foto
 
+### Videos
+- `GET /api/videos` - Listar videos
+- `POST /api/videos` - Crear video
+- `DELETE /api/videos/:id` - Eliminar video
+
+### Pedidos
+- `GET /api/pedidos` - Listar pedidos
+- `POST /api/pedidos` - Crear pedido
+- `GET /api/pedidos/:id` - Obtener pedido
+- `PUT /api/pedidos/:id` - Actualizar pedido
+
+### Abonados
+- `GET /api/abonados` - Listar abonados
+- `POST /api/abonados` - Registrar abonado
+- `GET /api/abonados/:id` - Obtener abonado
+- `PUT /api/abonados/:id` - Actualizar abonado
+
 ## 🐳 Deployment
 
 ### Con Docker

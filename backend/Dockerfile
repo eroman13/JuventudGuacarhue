@@ -2,6 +2,9 @@ FROM node:18-slim
 
 WORKDIR /app
 
+# Actualizar e instalar OpenSSL (solución raíz)
+RUN apt-get update -y && apt-get install -y openssl && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
 # Copiar archivos de dependencias
 COPY package*.json ./
 COPY prisma ./prisma
@@ -16,7 +19,7 @@ COPY tsconfig.json ./
 # Build
 RUN npm run build && npm run prisma:generate
 
-# Limpiar devDependencies
+# Limpiar devDependencies para producción
 RUN npm ci --only=production && npm cache clean --force
 
 # Exponer puerto

@@ -19,8 +19,8 @@ COPY tsconfig.json ./
 # Build
 RUN npm run build && npm run prisma:generate
 
-# Limpiar devDependencies para producción sin reinstalar dependencias
-RUN npm prune --omit=dev && npm cache clean --force
+# Limpiar cache de npm
+RUN npm cache clean --force
 
 # Exponer puerto
 EXPOSE 3000
@@ -29,5 +29,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Ejecutar aplicación
-CMD ["npm", "start"]
+# Ejecutar migraciones y luego levantar API
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

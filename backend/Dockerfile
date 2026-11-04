@@ -19,8 +19,8 @@ COPY tsconfig.json ./
 # Build
 RUN npm run build && npm run prisma:generate
 
-# Limpiar devDependencies para producción
-RUN npm ci --only=production && npm cache clean --force
+# Limpiar devDependencies para producción sin reinstalar dependencias
+RUN npm prune --omit=dev && npm cache clean --force
 
 # Exponer puerto
 EXPOSE 3000

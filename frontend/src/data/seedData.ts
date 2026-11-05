@@ -6,6 +6,11 @@ export interface NoticiaItem {
   imagen: string
   extracto: string
   destacada?: boolean
+  /**
+   * Cuerpo completo de la noticia en HTML (editor enriquecido).
+   * Opcional: si esta vacio se muestra solo el extracto.
+   */
+  contenido?: string
 }
 
 export interface PartidoItem {
@@ -96,6 +101,14 @@ export const noticiasSeed: NoticiaItem[] = [
     imagen:
       'https://scontent-scl3-1.xx.fbcdn.net/v/t39.30808-6/504256464_4212822292375757_2863909741882965330_n.jpg?stp=dst-jpg_tt6&cstp=mx1600x1066&ctp=s1600x1066&_nc_cat=101&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=EriwVdJyqEAQ7kNvwFpdPbw&_nc_oc=Ado2imdqW91-iVWGXiw9aZOVo9X9IwqDPa7CDXRtyr3OSwUKn9LQpgfhyyPfTcrydYMPbcIjX5R9cdzVx-qsDoV-&_nc_zt=23&_nc_ht=scontent-scl3-1.xx&_nc_gid=S0LzpK5khMq9F5tZoxF4vA&_nc_ss=792a8&oh=00_AQOsjMYxabeYHLuXQjodG1sMY6Pd9peVhDgyubuI4xt_bg&oe=6AE14558',
     extracto: 'Analisis del partido y estadisticas del encuentro mas importante de la temporada.',
+    contenido:
+      '<p>El primer equipo de Juventud Guacarhue se quedo con el clasico de la fecha tras un partido intenso, disputado ante un estadio repleto.</p>' +
+      '<h2>Un primer tiempo de estudio</h2>' +
+      '<p>Ambos equipos cuidaron el orden defensivo. La apertura del marcador llego con un remate de media distancia que descoloco al arquero visitante.</p>' +
+      '<h2>Figuras del encuentro</h2>' +
+      '<ul><li>El mediocampista <strong>destaco</strong> por su recuperacion y salida limpia.</li><li>La defensa sostuvo la ventaja en los minutos finales.</li></ul>' +
+      '<blockquote>"Fue un triunfo del grupo, trabajamos toda la semana para esto", senalo el tecnico.</blockquote>' +
+      '<p>Con este resultado el club suma tres puntos clave y se prepara para la proxima fecha del torneo.</p>',
     destacada: true,
   },
   {

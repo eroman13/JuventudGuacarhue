@@ -46,3 +46,75 @@ h1, h2, h3, h4 {
 .btn-secondary {
   @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors;
 }
+
+/* ------------------------------------------------------------------ */
+/* Contenido enriquecido de las noticias (editor + pagina publica)     */
+/* ------------------------------------------------------------------ */
+
+.news-content {
+  @apply text-[15px] leading-relaxed text-slate-700;
+}
+
+.news-content > * + * {
+  @apply mt-4;
+}
+
+.news-content h2 {
+  @apply mt-6 text-2xl font-bold text-slate-950;
+}
+
+.news-content h3 {
+  @apply mt-5 text-xl font-bold text-slate-900;
+}
+
+.news-content h4 {
+  @apply mt-4 text-lg font-bold text-slate-900;
+}
+
+.news-content strong,
+.news-content b {
+  @apply font-bold text-slate-900;
+}
+
+.news-content ul {
+  @apply list-disc pl-6;
+}
+
+.news-content ol {
+  @apply list-decimal pl-6;
+}
+
+.news-content li {
+  @apply mt-1;
+}
+
+.news-content blockquote {
+  @apply border-l-4 border-blue-300 bg-blue-50 px-4 py-2 italic text-slate-700;
+}
+
+.news-content a {
+  @apply text-blue-700 underline decoration-blue-300 hover:text-blue-800;
+}
+
+.news-content img {
+  @apply my-4 w-full rounded-lg shadow-sm;
+}
+
+.news-content figure {
+  @apply my-4;
+}
+
+.news-content figcaption {
+  @apply mt-1 text-center text-xs text-slate-500;
+}
+
+.news-content hr {
+  @apply my-6 border-slate-200;
+}
+
+/* Texto guia del editor cuando esta vacio. */
+.rich-editor[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none text-slate-400;
+}
+

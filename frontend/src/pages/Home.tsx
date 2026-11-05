@@ -168,7 +168,7 @@ export default function Home() {
               <p className="text-neutral-600">
                 {noticiaPrincipal?.extracto ?? 'Sigue las novedades deportivas, institucionales y comunitarias del club.'}
               </p>
-              <Link to="/noticias" className="inline-block border border-neutral-900 px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-neutral-900 hover:bg-neutral-900 hover:text-white">
+              <Link to={noticiaPrincipal ? `/noticias/${noticiaPrincipal.id}` : '/noticias'} className="inline-block border border-neutral-900 px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-neutral-900 hover:bg-neutral-900 hover:text-white">
                 Leer noticia completa
               </Link>
             </div>
@@ -210,7 +210,11 @@ export default function Home() {
               </p>
             )}
             {noticiasRecientes.map((item) => (
-              <article key={item.id} className="overflow-hidden rounded-lg border border-neutral-200">
+              <Link
+                key={item.id}
+                to={`/noticias/${item.id}`}
+                className="block overflow-hidden rounded-lg border border-neutral-200 transition-shadow hover:shadow-lg"
+              >
                 <ImagePreview
                   url={item.imagen}
                   alt={item.titulo}
@@ -222,7 +226,7 @@ export default function Home() {
                   </p>
                   <h4 className="text-lg font-bold text-neutral-900">{item.titulo}</h4>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         </div>

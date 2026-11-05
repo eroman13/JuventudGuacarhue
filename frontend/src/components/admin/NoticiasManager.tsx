@@ -12,6 +12,7 @@ import {
   formatFecha,
   inputClass,
   isImageSource,
+  labelClass,
   primaryButtonClass,
   readImageFile,
   secondaryButtonClass,
@@ -23,6 +24,7 @@ import {
   type ManagerProps,
   uploadImageFile,
 } from './ui'
+import RichTextEditor from './RichTextEditor'
 
 const CATEGORIAS = [
   'Resultados',
@@ -39,6 +41,7 @@ interface NoticiaForm {
   fecha: string
   imagen: string
   extracto: string
+  contenido: string
   destacada: boolean
 }
 
@@ -51,6 +54,7 @@ function createEmptyForm(): NoticiaForm {
     fecha: todayInputValue(),
     imagen: '',
     extracto: '',
+    contenido: '',
     destacada: false,
   }
 }
@@ -146,6 +150,7 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
       fecha: form.fecha,
       imagen: form.imagen.trim(),
       extracto: form.extracto.trim(),
+      contenido: form.contenido.trim(),
       destacada: form.destacada,
     }
 
@@ -171,6 +176,7 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
       fecha: noticia.fecha,
       imagen: noticia.imagen,
       extracto: noticia.extracto,
+      contenido: noticia.contenido ?? '',
       destacada: noticia.destacada ?? false,
     })
     setErrors({})
@@ -198,8 +204,8 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
         action={<Badge tone="blue">{noticias.length} publicadas</Badge>}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-        <div ref={formRef} className="xl:sticky xl:top-24 xl:self-start">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
+        <div ref={formRef}>
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold text-slate-950">
@@ -302,6 +308,20 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
                 />
               </Field>
 
+              <div>
+                <span className={labelClass}>Cuerpo de la noticia</span>
+                <RichTextEditor
+                  value={form.contenido}
+                  onChange={(html) => setField('contenido', html)}
+                  disabled={!canManage}
+                  notify={notify}
+                  previewTitulo={form.titulo || 'Titulo de la noticia'}
+                  previewCategoria={form.categoria}
+                  previewFecha={formatFecha(form.fecha)}
+                  previewImagen={form.imagen}
+                />
+              </div>
+
               <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
@@ -359,6 +379,7 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
                         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                           {formatFecha(noticia.fecha)}
                         </span>
+                        {noticia.contenido && <Badge tone="green">Con articulo completo</Badge>}
                       </div>
                       <h3 className="mt-2 text-lg font-bold leading-snug text-slate-950">
                         {noticia.titulo}

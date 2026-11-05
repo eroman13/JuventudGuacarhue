@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useClubData } from '../hooks/useClubData'
 import { ImagePreview, formatFecha } from '../components/admin/ui'
 
@@ -90,6 +91,12 @@ export default function Noticias() {
                         </p>
                         <h2 className="text-3xl font-bold text-neutral-950">{principal.titulo}</h2>
                         <p className="text-neutral-700">{principal.extracto}</p>
+                        <Link
+                          to={`/noticias/${principal.id}`}
+                          className="inline-block border border-neutral-900 px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-neutral-900 hover:bg-neutral-900 hover:text-white"
+                        >
+                          Leer noticia completa
+                        </Link>
                       </div>
                     </article>
 
@@ -110,9 +117,12 @@ export default function Noticias() {
                             <p className="text-[11px] uppercase tracking-[0.1em] text-neutral-500">
                               {noticia.categoria}
                             </p>
-                            <p className="mt-1 text-sm font-semibold text-neutral-900">
+                            <Link
+                              to={`/noticias/${noticia.id}`}
+                              className="mt-1 block text-sm font-semibold text-neutral-900 hover:text-blue-700"
+                            >
                               {noticia.titulo}
-                            </p>
+                            </Link>
                             <p className="mt-1 text-[11px] text-neutral-500">
                               {formatFecha(noticia.fecha)}
                             </p>
@@ -141,6 +151,12 @@ export default function Noticias() {
                           </p>
                           <h3 className="mt-2 text-lg font-bold text-neutral-900">{noticia.titulo}</h3>
                           <p className="mt-2 text-sm text-neutral-600">{noticia.extracto}</p>
+                          <Link
+                            to={`/noticias/${noticia.id}`}
+                            className="mt-3 inline-block text-xs font-bold uppercase tracking-[0.12em] text-blue-700 hover:text-blue-900"
+                          >
+                            Leer mas →
+                          </Link>
                         </div>
                       </article>
                     ))}

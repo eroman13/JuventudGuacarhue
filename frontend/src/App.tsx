@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import Home from './pages/Home'
 import Noticias from './pages/Noticias'
+import NoticiaDetalle from './pages/NoticiaDetalle'
 import Jugadores from './pages/Jugadores'
 import Partidos from './pages/Partidos'
 import Galeria from './pages/Galeria'
@@ -117,6 +118,7 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/noticias" element={<Noticias />} />
+            <Route path="/noticias/:id" element={<NoticiaDetalle />} />
             <Route path="/jugadores" element={<Jugadores />} />
             <Route path="/partidos" element={<Partidos />} />
             <Route path="/galeria" element={<Galeria />} />

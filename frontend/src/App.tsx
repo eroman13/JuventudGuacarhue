@@ -52,7 +52,7 @@ function AppContent() {
                   className="h-12 w-12 rounded-full border-2 border-blue-300 bg-blue-900 object-cover"
                   onError={(event) => {
                     const target = event.currentTarget
-                    target.style.display = 'none'
+                    target.classList.add('hidden')
                     if (fallbackLogoRef.current) {
                       fallbackLogoRef.current.classList.remove('hidden')
                     }

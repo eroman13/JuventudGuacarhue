@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, createContext, useCallback } from 'react'
-import { apiUrl } from '../lib/api'
+import { apiUrl, API_BASE_URL } from '../lib/api'
 
 export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MODERADOR' | 'EDITOR' | 'VIEWER'
 
@@ -79,21 +79,27 @@ async function pedirLogin(
       body: JSON.stringify({ email, password }),
     })
   } catch {
-    throw new ServidorNoDisponibleError('No pudimos conectar con el servidor de autenticacion.')
+    throw new ServidorNoDisponibleError(
+      `No pudimos conectar con el servidor de autenticacion (${API_BASE_URL}).`,
+    )
   }
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 400) {
       throw new Error('El correo o la contrasena no son correctos.')
     }
-    throw new ServidorNoDisponibleError('No pudimos conectar con el servidor de autenticacion.')
+    throw new ServidorNoDisponibleError(
+      `No pudimos conectar con el servidor de autenticacion (${API_BASE_URL}).`,
+    )
   }
 
   let payload: { token?: unknown; user?: unknown }
   try {
     payload = (await response.json()) as { token?: unknown; user?: unknown }
   } catch {
-    throw new ServidorNoDisponibleError('El servidor devolvio una respuesta inesperada.')
+    throw new ServidorNoDisponibleError(
+      `El servidor devolvio una respuesta inesperada (${API_BASE_URL}).`,
+    )
   }
 
   if (typeof payload.token !== 'string' || !isUser(payload.user)) {

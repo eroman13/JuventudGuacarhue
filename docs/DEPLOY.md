@@ -89,8 +89,41 @@ ya lista las variables de AWS).
 
 ---
 
-## 3. Verificación posterior al deploy
+---
 
+## 3.1 Diagnóstico rápido si aparece "Sesión de demostración"
+
+Ese aviso solo aparece cuando el `fetch` falla **a nivel de red** (no es un 401):
+el build quedó apuntando al dominio equivocado, CORS bloquea, o el backend está
+caído. Ahora el panel muestra la línea `API configurada: …` bajo el aviso: eso es
+exactamente la URL incrustada en el bundle.
+
+| Lo que ves en DevTools → Network | Causa | Solución |
+| --- | --- | --- |
+| La petición va a `https://<proyecto>.vercel.app/api/auth/login` (mismo dominio) | `VITE_API_URL` no existía cuando se construyó el bundle | Definirla en Vercel y **Redeploy** (no basta con guardarla) |
+| La petición va a `https://<servicio>.up.railway.app/api/auth/login` y falla con error de CORS | `CORS_ORIGIN` en Railway no incluye el dominio de Vercel, o el backend aún corre la versión anterior sin el CORS multi-origen | Actualizar `CORS_ORIGIN` y verificar que el deploy de Railway tenga el commit con el cambio |
+| `net::ERR_CONNECTION_REFUSED`, `502` o timeout | El servicio de Railway está caído o redesplegando | Revisar **Deploy Logs** en Railway (`/api/health` debe responder `OK`) |
+| La petición responde `200` con HTML | El rewrite SPA estaba capturando `/api/*` (versión antigua de `vercel.json`) | Usar el `vercel.json` actual, que excluye `/api/` |
+
+Comprobación manual del backend desde la terminal:
+
+```bash
+# 1) ¿Está vivo?
+curl -i https://<servicio>.up.railway.app/api/health
+
+# 2) ¿Permite el origen de Vercel? (debe devolver Access-Control-Allow-Origin)
+curl -i -X OPTIONS https://<servicio>.up.railway.app/api/auth/login \
+  -H "Origin: https://<proyecto>.vercel.app" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+Si el paso 2 **no** devuelve `access-control-allow-origin: https://<proyecto>.vercel.app`,
+el problema está en `CORS_ORIGIN` de Railway (variables + redeploy).
+
+---
+
+## 3.2 Verificación posterior al deploy
 - [ ] `https://<proyecto>.vercel.app/` carga la portada.
 - [ ] Recargar con F5 en `/noticias`, `/galeria` y `/admin` no da 404.
 - [ ] Login en `/login` con el administrador real (no la cuenta demo) entra al panel.

@@ -11,6 +11,13 @@
 
 const RAW_API_URL = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')
 
+if (import.meta.env.PROD && !RAW_API_URL) {
+  console.warn(
+    '[api] VITE_API_URL no esta definida en el build. Las llamadas a la API se haran ' +
+      'contra el mismo dominio del sitio (no contra Railway). Define la variable en Vercel y vuelve a desplegar.',
+  )
+}
+
 /** URL base de la API. Siempre termina en `/api`. */
 export const API_BASE_URL = RAW_API_URL
   ? RAW_API_URL.endsWith('/api')

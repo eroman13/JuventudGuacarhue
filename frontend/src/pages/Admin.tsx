@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ROLES_QUE_EDITAN, useAuth } from '../hooks/useAuth'
+import { API_BASE_URL } from '../lib/api'
 import { ADMIN_TABS, type AdminTab } from '../components/admin/tabs'
 import { Badge, type Notify } from '../components/admin/ui'
 import Dashboard from '../components/admin/Dashboard'
@@ -127,10 +128,15 @@ export default function Admin() {
       {isDemoMode && (
         <div className="border-b border-amber-200 bg-amber-50">
           <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
-            <p className="text-xs font-semibold text-amber-800">
-              Sesion de demostracion: el backend no esta disponible. Los contenidos se guardan solo
-              en este navegador.
-            </p>
+            <div>
+              <p className="text-xs font-semibold text-amber-800">
+                Sesion de demostracion: el backend no esta disponible. Los contenidos se guardan solo
+                en este navegador.
+              </p>
+              <p className="mt-0.5 break-all text-[10px] uppercase tracking-[0.06em] text-amber-700/80">
+                API configurada: {API_BASE_URL}
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleReconectar}

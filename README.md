@@ -160,7 +160,7 @@ docker run -e DATABASE_URL=... -p 3000:3000 juventud-guacarhue-backend
 ```
 
 ### En Railway o Vercel
-Ver documentación específica en `docs/deployment.md`
+Ver la guía paso a paso en `docs/DEPLOY.md`.
 
 ## 📝 Licencia
 

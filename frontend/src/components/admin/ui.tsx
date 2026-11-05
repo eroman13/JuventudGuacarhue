@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { apiUrl, resolveMediaUrl } from '../../lib/api'
 
 export type Notify = (message: string, tone?: 'success' | 'error') => void
 
@@ -150,7 +151,7 @@ export function ImagePreview({
 
   return (
     <img
-      src={url}
+      src={resolveMediaUrl(url)}
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
@@ -273,10 +274,7 @@ export async function uploadImageFile(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('image', file)
 
-  const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
-  const uploadUrl = apiBaseUrl ? `${apiBaseUrl}/uploads` : '/api/uploads'
-
-  const response = await fetch(uploadUrl, {
+  const response = await fetch(apiUrl('/uploads'), {
     method: 'POST',
     body: formData,
   })
@@ -290,7 +288,9 @@ export async function uploadImageFile(file: File): Promise<string> {
     throw new Error('La respuesta del servidor no incluyó la URL de la imagen.')
   }
 
-  return payload.url
+  // Guardamos la URL absoluta del backend para que la imagen se vea igual
+  // desde el sitio publicado en Vercel.
+  return resolveMediaUrl(payload.url)
 }
 
 export function readImageFile(file: File): Promise<string> {

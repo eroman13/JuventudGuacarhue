@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext, createContext, useCallback } from 'react'
+import { apiUrl } from '../lib/api'
 
 export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MODERADOR' | 'EDITOR' | 'VIEWER'
 
@@ -72,7 +73,7 @@ async function pedirLogin(
   let response: Response
 
   try {
-    response = await fetch('/api/auth/login', {
+    response = await fetch(apiUrl('/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -239,7 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let response: Response
 
       try {
-        response = await fetch('/api/auth/register', {
+        response = await fetch(apiUrl('/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim().toLowerCase(), password, nombre, apellido }),

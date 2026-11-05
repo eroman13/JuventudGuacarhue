@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useClubData } from '../hooks/useClubData'
 import { ImagePreview, formatFecha } from '../components/admin/ui'
+import { resolveMediaUrl } from '../lib/api'
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -75,7 +76,7 @@ export default function Home() {
               index === currentSlide ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <img src={slide.image} alt={slide.title} className="h-full w-full object-cover" />
+            <img src={resolveMediaUrl(slide.image)} alt={slide.title} className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
             <div className="container-max-width absolute inset-0 flex items-end pb-20">
               <div className="max-w-3xl text-white">

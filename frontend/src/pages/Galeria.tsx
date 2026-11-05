@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useClubData } from '../hooks/useClubData'
 import { ImagePreview, formatFecha } from '../components/admin/ui'
+import { resolveMediaUrl } from '../lib/api'
 
 const TODAS = 'Todas'
 
@@ -103,7 +104,7 @@ export default function Galeria() {
         >
           <div className="max-h-full w-full max-w-4xl" onClick={(event) => event.stopPropagation()}>
             <img
-              src={fotoAmpliada.url}
+              src={resolveMediaUrl(fotoAmpliada.url)}
               alt={fotoAmpliada.categoria}
               className="mx-auto max-h-[80vh] w-auto rounded-lg object-contain"
             />

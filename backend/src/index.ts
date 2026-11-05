@@ -62,10 +62,26 @@ async function ensureDefaultAdmin(): Promise<void> {
 }
 
 // Middlewares
+// CORS_ORIGIN acepta una lista separada por comas, por ejemplo:
+// CORS_ORIGIN=https://juventud-guacarhue.vercel.app,http://localhost:5173
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Sin cabecera Origin (curl, health checks, mismo origen) se permite.
+    if (!origin || corsOrigins.includes('*') || corsOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    console.warn(`⚠️ Origen bloqueado por CORS: ${origin}`);
+    callback(null, false);
+  },
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads')));

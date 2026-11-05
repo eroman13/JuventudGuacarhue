@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ROLES_QUE_EDITAN, useAuth } from '../hooks/useAuth'
+import { useClubData } from '../hooks/useClubData'
 import { API_BASE_URL } from '../lib/api'
 import { ADMIN_TABS, type AdminTab } from '../components/admin/tabs'
 import { Badge, type Notify } from '../components/admin/ui'
@@ -42,6 +43,25 @@ export default function Admin() {
   const [toast, setToast] = useState<ToastState | null>(null)
   const [reconectando, setReconectando] = useState(false)
   const timerRef = useRef<number | null>(null)
+  const { sincronizacion, recargarContenido } = useClubData()
+
+  const syncTone =
+    sincronizacion.estado === 'sincronizado'
+      ? 'green'
+      : sincronizacion.estado === 'error' || sincronizacion.estado === 'sin-sesion'
+        ? 'amber'
+        : 'blue'
+
+  const syncLabel =
+    sincronizacion.estado === 'sincronizado'
+      ? 'Contenido en el servidor'
+      : sincronizacion.estado === 'guardando'
+        ? 'Guardando...'
+        : sincronizacion.estado === 'sin-sesion'
+          ? 'Solo este navegador'
+          : sincronizacion.estado === 'error'
+            ? 'Sin conexión al servidor'
+            : 'Cargando contenido'
 
   const notify = useCallback<Notify>((message, tone = 'success') => {
     setToast({ message, tone })
@@ -108,6 +128,13 @@ export default function Admin() {
               <p className="text-[11px] text-slate-400">{user.email}</p>
             </div>
             <Badge tone={canManage ? 'green' : 'amber'}>{user.rol}</Badge>
+            <button
+              type="button"
+              onClick={() => void recargarContenido(true)}
+              title={`${sincronizacion.mensaje} (haz clic para recargar el contenido del servidor)`}
+            >
+              <Badge tone={syncTone}>{syncLabel}</Badge>
+            </button>
             <Link
               to="/"
               className="rounded-lg border border-white/20 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-200 transition hover:border-white/40 hover:text-white"
@@ -205,7 +232,7 @@ export default function Admin() {
           {activeTab === 'videos' && <VideosManager canManage={canManage} notify={notify} />}
           {activeTab === 'pedidos' && <PedidosManager canManage={canManage} notify={notify} />}
           {activeTab === 'abonados' && <AbonadosManager canManage={canManage} notify={notify} />}
-          {activeTab === 'config' && <ConfigPanel />}
+          {activeTab === 'config' && <ConfigPanel notify={notify} />}
           {activeTab === 'respaldo' && <RespaldoPanel canManage={canManage} notify={notify} />}
         </main>
       </div>

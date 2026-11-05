@@ -398,3 +398,18 @@ model Pagina {
 
   @@index([slug])
 }
+
+// ============================================
+// CONTENIDO EDITABLE DEL SITIO
+// ============================================
+
+/// Documento unico con todo el contenido administrable del sitio
+/// (noticias, partidos, planteles, galeria, productos, videos, pedidos,
+/// abonados y configuracion). Se guarda completo en cada cambio para que
+/// todos los visitantes vean lo mismo sin importar el dispositivo.
+model ContenidoSitio {
+  id        String   @id @default("principal")
+  datos     Json
+  creadoEn  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

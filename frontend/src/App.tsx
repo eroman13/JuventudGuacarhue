@@ -9,12 +9,23 @@ import Tienda from './pages/Tienda'
 import Admin from './pages/Admin'
 import Login from './pages/Login'
 import { useAuth } from './hooks/useAuth'
+import { useClubData } from './hooks/useClubData'
+import { resolveMediaUrl } from './lib/api'
 
-const CLUB_LOGO_URL = 'https://scontent-scl3-1.xx.fbcdn.net/v/t39.30808-6/798084742_4698571657134149_5053335982381798469_n.jpg?stp=dst-jpg_tt6&cstp=mx1254x1254&ctp=s1254x1254&_nc_cat=104&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=Q7Y0EpyRejIQ7kNvwHCgx0F&_nc_oc=Adp9k1FiFQbCUIRYx2mLCEsHqv5Z62uAPqPl-EEmxI0xraaV1SvwaEOf8OwTkW4mhEoGTXXT_pkUMjMbX7KuvzvQ&_nc_zt=23&_nc_ht=scontent-scl3-1.xx&_nc_gid=AMH9LOpBdGp838RAhpQpuw&_nc_ss=7b2a8&oh=00_AQQDdaz7huBzJ2a_nxDDrS05blhfj-9LuCpoABEqvRDtrg&oe=6AEAA16F'
+/**
+ * Escudo que se muestra mientras el club no suba su propio logo desde
+ * Panel de administración → Configuración → Identidad del club.
+ */
+const LOGO_POR_DEFECTO =
+  'https://scontent-scl3-1.xx.fbcdn.net/v/t39.30808-6/798084742_4698571657134149_5053335982381798469_n.jpg?stp=dst-jpg_tt6&cstp=mx1254x1254&ctp=s1254x1254&_nc_cat=104&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=Q7Y0EpyRejIQ7kNvwHCgx0F&_nc_oc=Adp9k1FiFQbCUIRYx2mLCEsHqv5Z62uAPqPl-EEmxI0xraaV1SvwaEOf8OwTkW4mhEoGTXXT_pkUMjMbX7KuvzvQ&_nc_zt=23&_nc_ht=scontent-scl3-1.xx&_nc_gid=AMH9LOpBdGp838RAhpQpuw&_nc_ss=7b2a8&oh=00_AQQDdaz7huBzJ2a_nxDDrS05blhfj-9LuCpoABEqvRDtrg&oe=6AEAA16F'
 
 function AppContent() {
   const { user, isLoggedIn, logout } = useAuth()
+  const { config } = useClubData()
   const fallbackLogoRef = useRef<HTMLDivElement | null>(null)
+
+  const logoSrc = resolveMediaUrl(config.logoUrl) || LOGO_POR_DEFECTO
+  const desde = config.desde.trim()
 
   const navLinkClass =
     'px-3 py-6 text-xs sm:text-sm font-semibold tracking-[0.08em] text-white/85 hover:text-white transition-colors'
@@ -24,7 +35,7 @@ function AppContent() {
       <div className="flex min-h-screen flex-col bg-slate-50">
         <header className="site-grid-texture border-b border-blue-900 bg-blue-950 text-white">
           <div className="container-max-width flex min-h-10 items-center justify-between text-[11px] uppercase tracking-[0.1em] text-white/70">
-            <p>Sitio oficial Club Deportivo Juventud Guacarhue</p>
+            <p>Sitio oficial Club Deportivo {config.nombreClub}</p>
             <div className="flex gap-4">
               <a href="https://www.facebook.com/Guacarhue" target="_blank" rel="noreferrer" className="hover:text-white">Facebook</a>
               <span className="text-white/40">Instagram</span>
@@ -35,8 +46,9 @@ function AppContent() {
             <div className="container-max-width flex items-center justify-between">
               <Link to="/" className="flex items-center gap-3 py-4">
                 <img
-                  src={CLUB_LOGO_URL}
-                  alt="Escudo Juventud Guacarhue"
+                  key={logoSrc}
+                  src={logoSrc}
+                  alt={`Escudo ${config.nombreClub}`}
                   className="h-12 w-12 rounded-full border-2 border-blue-300 bg-blue-900 object-cover"
                   onError={(event) => {
                     const target = event.currentTarget
@@ -53,8 +65,10 @@ function AppContent() {
                   JG
                 </div>
                 <div className="leading-tight">
-                  <div className="text-sm font-bold uppercase tracking-[0.18em]">Juventud Guacarhue</div>
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-white/60">Desde 1990</div>
+                  <div className="text-sm font-bold uppercase tracking-[0.18em]">{config.nombreClub}</div>
+                  {desde && (
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-white/60">Desde {desde}</div>
+                  )}
                 </div>
               </Link>
 
@@ -108,7 +122,7 @@ function AppContent() {
           <div className="container-max-width py-12">
             <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
               <div>
-                <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.14em] text-blue-300">Juventud Guacarhue</h3>
+                <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.14em] text-blue-300">{config.nombreClub}</h3>
                 <p className="text-sm text-white/65">
                   Plataforma oficial para noticias, planteles, calendario deportivo y contenido institucional del club.
                 </p>

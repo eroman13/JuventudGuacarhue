@@ -107,6 +107,19 @@ La aplicación estará disponible en `http://localhost:5173`
 - `POST /api/auth/refresh` - Refresh token
 - `POST /api/auth/logout` - Logout
 
+### Contenido del sitio (panel de administración)
+- `GET /api/contenido` - Contenido publicado (público, sin autenticación)
+- `PUT /api/contenido` - Reemplaza el documento completo (requiere EDITOR o superior)
+
+Todo lo editable del sitio (noticias, partidos, planteles, galería, productos,
+videos, pedidos, abonados y la configuración del sitio) se guarda como **un
+único documento JSON** en la tabla `ContenidoSitio`. Así, cualquier cambio hecho
+desde el panel lo ven todos los visitantes, en cualquier dispositivo.
+
+> Las rutas de sección que aparecen más abajo (`/api/noticias`, `/api/galeria`,
+> etc.) son *placeholders* heredados del diseño inicial: responden pero todavía
+> no persisten datos. El sitio usa `/api/contenido`.
+
 ### Noticias
 - `GET /api/noticias` - Listar todas
 - `POST /api/noticias` - Crear nueva

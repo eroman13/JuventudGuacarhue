@@ -1,11 +1,21 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useClubData } from '../../hooks/useClubData'
-import { updateConfig } from '../../data/clubStore'
-import { SectionHeading, Badge } from './ui'
+import { getSyncSnapshot, updateConfig } from '../../data/clubStore'
+import { Badge, ImagePreview, SectionHeading, inputClass, labelClass, uploadImageFile, type Notify } from './ui'
 
-export default function ConfigPanel() {
-  const { config, noticias } = useClubData()
+interface ConfigPanelProps {
+  notify: Notify
+}
+
+export default function ConfigPanel({ notify }: ConfigPanelProps) {
+  const { config, noticias, sincronizacion, guardarEnServidor } = useClubData()
+
+  const [nombreClub, setNombreClub] = useState(config.nombreClub)
+  const [desde, setDesde] = useState(config.desde)
+  const [logoUrl, setLogoUrl] = useState(config.logoUrl)
   const [carouselItems, setCarouselItems] = useState(config.carouselItems)
+  const [subiendoLogo, setSubiendoLogo] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement | null>(null)
 
   const noticiasDestacadas = useMemo(
     () => noticias.filter((n) => n.destacada).length,
@@ -14,10 +24,70 @@ export default function ConfigPanel() {
 
   const noticiasDisponibles = Math.min(noticiasDestacadas, carouselItems)
 
-  const handleSave = () => {
-    const validValue = Math.max(1, Math.min(10, carouselItems))
-    updateConfig({ carouselItems: validValue })
+  const restablecer = () => {
+    setNombreClub(config.nombreClub)
+    setDesde(config.desde)
+    setLogoUrl(config.logoUrl)
+    setCarouselItems(config.carouselItems)
   }
+
+  const handleLogoFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) {
+      return
+    }
+
+    setSubiendoLogo(true)
+    try {
+      const url = await uploadImageFile(file)
+      setLogoUrl(url)
+      notify('Logo cargado. Recuerda guardar los cambios.')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No se pudo subir el logo.', 'error')
+    } finally {
+      setSubiendoLogo(false)
+    }
+  }
+
+  const handleSave = async () => {
+    const cantidadValida = Math.max(1, Math.min(10, carouselItems))
+
+    updateConfig({
+      carouselItems: cantidadValida,
+      nombreClub: nombreClub.trim() || config.nombreClub,
+      desde: desde.trim(),
+      logoUrl: logoUrl.trim(),
+    })
+    setCarouselItems(cantidadValida)
+
+    const guardado = await guardarEnServidor()
+
+    if (guardado) {
+      notify('Configuración guardada: ya la ven todos los visitantes.')
+    } else {
+      notify(getSyncSnapshot().mensaje, 'error')
+    }
+  }
+
+  const syncTone =
+    sincronizacion.estado === 'sincronizado'
+      ? 'green'
+      : sincronizacion.estado === 'error' || sincronizacion.estado === 'sin-sesion'
+        ? 'amber'
+        : 'blue'
+
+  const syncLabel =
+    sincronizacion.estado === 'sincronizado'
+      ? 'En el servidor'
+      : sincronizacion.estado === 'guardando'
+        ? 'Guardando'
+        : sincronizacion.estado === 'sin-sesion'
+          ? 'Solo este navegador'
+          : sincronizacion.estado === 'error'
+            ? 'Sin conexión'
+            : 'Cargando'
 
   const getStatusColor = () => {
     if (noticiasDestacadas === 0) return 'amber'
@@ -29,8 +99,131 @@ export default function ConfigPanel() {
     <div className="space-y-6">
       <SectionHeading
         title="Configuración del Sitio"
-        description="Ajusta los parámetros principales del carrusel de noticias."
+        description="Logo, nombre del club, año de fundación y carrusel de noticias."
       />
+
+      {/* Identidad del club */}
+      <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Identidad del club</h3>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="config-nombre" className={labelClass}>
+                Nombre del club
+              </label>
+              <input
+                id="config-nombre"
+                type="text"
+                value={nombreClub}
+                onChange={(event) => setNombreClub(event.target.value)}
+                className={inputClass}
+                placeholder="Juventud Guacarhue"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Aparece en el encabezado y en el pie de todas las páginas.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="config-desde" className={labelClass}>
+                Año de fundación (Desde)
+              </label>
+              <input
+                id="config-desde"
+                type="text"
+                inputMode="numeric"
+                maxLength={12}
+                value={desde}
+                onChange={(event) => setDesde(event.target.value)}
+                className={inputClass}
+                placeholder="1990"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Se muestra como &quot;Desde {desde.trim() || '1990'}&quot; bajo el nombre del
+                club. Déjalo vacío para ocultarlo.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Logo y vista previa</h3>
+
+          <label htmlFor="config-logo" className={labelClass}>
+            Logo o escudo (URL)
+          </label>
+          <input
+            id="config-logo"
+            type="text"
+            value={logoUrl}
+            onChange={(event) => setLogoUrl(event.target.value)}
+            className={inputClass}
+            placeholder="https://... o sube una imagen"
+          />
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              disabled={subiendoLogo}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {subiendoLogo ? 'Subiendo...' : 'Subir imagen'}
+            </button>
+
+            {logoUrl.trim() !== '' && (
+              <button
+                type="button"
+                onClick={() => setLogoUrl('')}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                Quitar logo
+              </button>
+            )}
+
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoFile}
+            />
+          </div>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Si lo dejas vacío se sigue usando el escudo actual del club.
+          </p>
+
+          <div className="mt-4 flex items-center gap-3 rounded-lg bg-blue-950 p-4 text-white">
+            <ImagePreview
+              url={logoUrl}
+              alt="Escudo del club"
+              className="h-12 w-12 shrink-0 rounded-full border-2 border-blue-300 object-cover"
+            />
+            <div className="leading-tight">
+              <div className="text-sm font-bold uppercase tracking-[0.18em]">
+                {nombreClub.trim() || 'Juventud Guacarhue'}
+              </div>
+              {desde.trim() !== '' && (
+                <div className="text-[11px] uppercase tracking-[0.16em] text-white/60">
+                  Desde {desde.trim()}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                Guardado
+              </p>
+              <Badge tone={syncTone}>{syncLabel}</Badge>
+            </div>
+            <p className="mt-2 text-xs text-slate-600">{sincronizacion.mensaje}</p>
+          </div>
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Panel de Información */}
@@ -98,7 +291,7 @@ export default function ConfigPanel() {
 
         {/* Panel de Configuración */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-bold text-gray-900">Ajustes</h3>
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Carrusel de la portada</h3>
 
           <div className="space-y-4">
             <div>
@@ -128,13 +321,15 @@ export default function ConfigPanel() {
               </p>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={handleSave}
                   className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                 >
                   Guardar Cambios
                 </button>
                 <button
-                  onClick={() => setCarouselItems(config.carouselItems)}
+                  type="button"
+                  onClick={restablecer}
                   className="flex-1 px-4 py-2.5 bg-slate-200 text-slate-800 rounded-lg hover:bg-slate-300 transition-colors font-medium text-sm"
                 >
                   Cancelar

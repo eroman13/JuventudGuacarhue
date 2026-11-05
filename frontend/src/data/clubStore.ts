@@ -1,8 +1,10 @@
 import {
   abonadosSeed,
   clubDataSeed,
+  configuracionSeed,
   pedidosSeed,
   type ClubData,
+  type ConfiguracionSitio,
   type AbonadoItem,
   type GaleriaItem,
   type JugadorItem,
@@ -13,13 +15,15 @@ import {
   type VideoItem,
   videosSeed,
 } from './seedData'
+import { apiUrl } from '../lib/api'
 
 /**
- * Almacén local de contenidos del club.
+ * Almacén de contenidos del club.
  *
  * Es la única fuente de verdad para las páginas públicas y el panel de
- * administración. Persiste en localStorage y notifica a todos los componentes
- * suscritos (useClubData) para que los cambios se reflejen al instante.
+ * administración. Se hidrata desde el backend (`GET /api/contenido`), se
+ * guarda en localStorage como caché y cada cambio se envía al servidor
+ * (`PUT /api/contenido`) para que todos los visitantes vean lo mismo.
  */
 export const CLUB_DATA_STORAGE_KEY = 'juventud_club_data_v1'
 const STORAGE_KEY = CLUB_DATA_STORAGE_KEY
@@ -60,6 +64,23 @@ export function isValidClubData(value: unknown): value is ClubData {
   )
 }
 
+function normalizarConfig(valor: unknown): ConfiguracionSitio {
+  const origen = isRecord(valor) ? valor : {}
+
+  return {
+    carouselItems:
+      typeof origen.carouselItems === 'number' && Number.isFinite(origen.carouselItems)
+        ? origen.carouselItems
+        : configuracionSeed.carouselItems,
+    nombreClub:
+      typeof origen.nombreClub === 'string' && origen.nombreClub.trim()
+        ? origen.nombreClub
+        : configuracionSeed.nombreClub,
+    desde: typeof origen.desde === 'string' ? origen.desde : configuracionSeed.desde,
+    logoUrl: typeof origen.logoUrl === 'string' ? origen.logoUrl : configuracionSeed.logoUrl,
+  }
+}
+
 function normalizeClubData(value: unknown): ClubData | null {
   if (!isRecord(value)) {
     return null
@@ -87,9 +108,7 @@ function normalizeClubData(value: unknown): ClubData | null {
     abonados: Array.isArray(value.abonados)
       ? (value.abonados as AbonadoItem[])
       : clone(abonadosSeed),
-    config: isRecord(value.config) && typeof value.config.carouselItems === 'number' 
-      ? (value.config as ClubData['config'])
-      : clone(clubDataSeed.config),
+    config: normalizarConfig(value.config),
   }
 
   return normalized
@@ -125,18 +144,23 @@ function emit(): void {
   listeners.forEach((listener) => listener())
 }
 
-function commit(next: ClubData): void {
-  snapshot = next
-
-  if (typeof window !== 'undefined') {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    } catch {
-      // Si el almacenamiento está lleno o bloqueado mantenemos el estado en memoria.
-    }
+function guardarEnNavegador(next: ClubData): void {
+  if (typeof window === 'undefined') {
+    return
   }
 
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // Si el almacenamiento está lleno o bloqueado mantenemos el estado en memoria.
+  }
+}
+
+function commit(next: ClubData): void {
+  snapshot = next
+  guardarEnNavegador(next)
   emit()
+  programarGuardado()
 }
 
 export function subscribe(listener: Listener): () => void {
@@ -562,4 +586,216 @@ export function importClubData(raw: string): { ok: true } | { ok: false; error: 
 
 export function resetClubData(): void {
   commit(clone(clubDataSeed))
+}
+
+/* ------------------------------------------------------------------ */
+/* Sincronizacion con el servidor                                      */
+/* ------------------------------------------------------------------ */
+
+export type EstadoSincronizacion = 'inicial' | 'guardando' | 'sincronizado' | 'sin-sesion' | 'error'
+
+export interface EstadoSync {
+  estado: EstadoSincronizacion
+  /** Texto listo para mostrar al administrador. */
+  mensaje: string
+  /** Última vez que el servidor confirmó un guardado (ISO 8601). */
+  actualizadoEn: string | null
+}
+
+const TOKEN_KEY = 'token'
+const DEMO_TOKEN = 'demo-token-local'
+/** Tiempo mínimo entre descargas para no pedir el contenido en cada navegación. */
+const INTERVALO_ENTRE_CARGAS_MS = 20_000
+/** Espera tras el último cambio antes de enviarlo al servidor. */
+const RETARDO_GUARDADO_MS = 800
+
+let estadoSync: EstadoSync = {
+  estado: 'inicial',
+  mensaje: 'Cargando el contenido del servidor...',
+  actualizadoEn: null,
+}
+
+const syncListeners = new Set<Listener>()
+
+export function getSyncSnapshot(): EstadoSync {
+  return estadoSync
+}
+
+export function subscribeSync(listener: Listener): () => void {
+  syncListeners.add(listener)
+  return () => {
+    syncListeners.delete(listener)
+  }
+}
+
+function setEstadoSync(parcial: Partial<EstadoSync>): void {
+  estadoSync = { ...estadoSync, ...parcial }
+  syncListeners.forEach((listener) => listener())
+}
+
+/** Token real del backend; devuelve null en modo demostración o sin sesión. */
+function leerToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const token = window.localStorage.getItem(TOKEN_KEY)
+    if (!token || token === DEMO_TOKEN) {
+      return null
+    }
+    return token
+  } catch {
+    return null
+  }
+}
+
+let ultimaCarga = 0
+
+/**
+ * Descarga el contenido publicado en el servidor y reemplaza el estado local.
+ * Cada dispositivo ve exactamente el mismo contenido.
+ */
+export async function cargarContenidoRemoto(forzar = false): Promise<void> {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const ahora = Date.now()
+  if (!forzar && ultimaCarga !== 0 && ahora - ultimaCarga < INTERVALO_ENTRE_CARGAS_MS) {
+    return
+  }
+  ultimaCarga = ahora
+
+  try {
+    const respuesta = await fetch(apiUrl('/contenido'), {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    })
+
+    if (!respuesta.ok) {
+      throw new Error(`HTTP ${respuesta.status}`)
+    }
+
+    const payload = (await respuesta.json()) as {
+      datos?: unknown
+      actualizadoEn?: string | null
+    }
+
+    const normalizado = payload.datos ? normalizeClubData(payload.datos) : null
+
+    if (normalizado) {
+      const siguiente = clone(normalizado)
+      snapshot = siguiente
+      guardarEnNavegador(siguiente)
+      emit()
+    }
+
+    setEstadoSync({
+      estado: 'sincronizado',
+      mensaje: normalizado
+        ? 'Contenido compartido: lo ven todos los visitantes.'
+        : 'El servidor aún no tiene contenido guardado; se muestra el contenido inicial.',
+      actualizadoEn: payload.actualizadoEn ?? null,
+    })
+  } catch {
+    setEstadoSync({
+      estado: 'error',
+      mensaje: 'No se pudo leer el servidor: los cambios quedan solo en este navegador.',
+      actualizadoEn: null,
+    })
+  }
+}
+
+let temporizadorGuardado: ReturnType<typeof setTimeout> | null = null
+let guardadoEnCurso = false
+let guardadoPendiente = false
+
+function programarGuardado(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  if (temporizadorGuardado) {
+    clearTimeout(temporizadorGuardado)
+  }
+
+  temporizadorGuardado = setTimeout(() => {
+    temporizadorGuardado = null
+    void guardarEnServidor()
+  }, RETARDO_GUARDADO_MS)
+}
+
+/**
+ * Envía el documento completo al backend. Requiere una sesión real
+ * (el modo demostración solo guarda en este navegador).
+ */
+export async function guardarEnServidor(): Promise<boolean> {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const token = leerToken()
+  if (!token) {
+    setEstadoSync({
+      estado: 'sin-sesion',
+      mensaje:
+        'Inicia sesión con tu cuenta del club para guardar en el servidor. Por ahora los cambios quedan en este navegador.',
+    })
+    return false
+  }
+
+  if (guardadoEnCurso) {
+    guardadoPendiente = true
+    return false
+  }
+
+  guardadoEnCurso = true
+  setEstadoSync({ estado: 'guardando', mensaje: 'Guardando en el servidor...' })
+
+  try {
+    const respuesta = await fetch(apiUrl('/contenido'), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ datos: getSnapshot() }),
+    })
+
+    if (respuesta.status === 401 || respuesta.status === 403) {
+      setEstadoSync({
+        estado: 'sin-sesion',
+        mensaje: 'Tu sesión ya no permite guardar. Vuelve a iniciar sesión y repite el cambio.',
+      })
+      return false
+    }
+
+    if (!respuesta.ok) {
+      throw new Error(`HTTP ${respuesta.status}`)
+    }
+
+    const payload = (await respuesta.json()) as { actualizadoEn?: string | null }
+
+    setEstadoSync({
+      estado: 'sincronizado',
+      mensaje: 'Guardado en el servidor: todos los visitantes ven estos cambios.',
+      actualizadoEn: payload.actualizadoEn ?? new Date().toISOString(),
+    })
+    return true
+  } catch {
+    setEstadoSync({
+      estado: 'error',
+      mensaje:
+        'No se pudo guardar en el servidor. Revisa la conexión: los cambios quedan solo en este navegador.',
+    })
+    return false
+  } finally {
+    guardadoEnCurso = false
+
+    if (guardadoPendiente) {
+      guardadoPendiente = false
+      programarGuardado()
+    }
+  }
 }

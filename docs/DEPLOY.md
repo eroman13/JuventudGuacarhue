@@ -133,6 +133,49 @@ el problema está en `CORS_ORIGIN` de Railway (variables + redeploy).
 
 ---
 
+## 3.3 Contenido editable y logo del club
+
+Todo el contenido del sitio (noticias, fotos, jugadores, partidos, tienda y la
+configuración) se guarda en el backend, en la tabla `ContenidoSitio`, mediante
+`GET/PUT /api/contenido`. El frontend lo descarga al abrir cualquier página y
+envía los cambios automáticamente al guardar en el panel.
+
+### Cambiar el logo y el "Desde"
+
+1. Entra a `https://<proyecto>.vercel.app/admin`.
+2. Abre la pestaña **Configuración**.
+3. En **Identidad del club** cambia:
+   - **Nombre del club** (encabezado y pie del sitio).
+   - **Año de fundación** → se muestra como *"Desde 1990"*. Vacío = se oculta.
+   - **Logo o escudo**: pega una URL o usa **Subir imagen** (se sube a
+     `/uploads/` del backend). Vacío = se usa el escudo actual del club.
+4. Pulsa **Guardar Cambios**.
+
+El indicador de la esquina superior derecha del panel dice en qué estado está el
+guardado:
+
+| Indicador | Significado |
+| --- | --- |
+| `Contenido en el servidor` | Todo guardado: lo ven todos los visitantes |
+| `Guardando...` | Enviando los cambios al backend |
+| `Solo este navegador` | No hay sesión real (modo demo) o la sesión expiró: **los cambios no se publican** |
+| `Sin conexión al servidor` | El backend no responde (revisar `/api/health`) |
+
+> Si el panel muestra `Solo este navegador`, cierra sesión y vuelve a entrar con
+> la cuenta real (`DEFAULT_ADMIN_EMAIL`). La cuenta de demostración nunca guarda
+> en el servidor.
+
+### Publicar el contenido que ya tenías cargado
+
+Si ya habías editado noticias, fotos, etc. antes de este cambio, ese contenido
+estaba solo en tu navegador. Para publicarlo:
+
+1. Abre el panel en **el mismo navegador** donde lo editaste.
+2. Ve a **Configuración** y pulsa **Guardar Cambios** (o edita cualquier cosa).
+3. El indicador debe pasar a `Contenido en el servidor`.
+
+---
+
 ## 4. Problemas comunes
 
 | Síntoma | Causa probable | Solución |
@@ -142,6 +185,7 @@ el problema está en `CORS_ORIGIN` de Railway (variables + redeploy).
 | Error CORS en consola | `CORS_ORIGIN` en Railway no incluye el dominio de Vercel | Agregarlo (separado por coma) y redeployar |
 | 404 al recargar `/admin` o `/noticias` | Falta el rewrite SPA o `Root Directory` no es `frontend` | Revisar `frontend/vercel.json` y la configuración del proyecto |
 | Imágenes `/uploads/...` dan 404 | El contenedor se redeployó y borró los archivos, o la URL no apunta al backend | Volver a subirlas y/o migrar a S3/R2 |
+| Cambio algo en el panel y otro dispositivo no lo ve | El panel muestra `Solo este navegador` (modo demo / sesión expirada) o no se pulsó Guardar | Volver a iniciar sesión con la cuenta real y guardar; comprobar `GET /api/contenido` |
 | Build de Vercel falla con `tsc` | Errores de TypeScript | Ejecutar `cd frontend && npm run build` localmente antes de pushear |
 
 ---

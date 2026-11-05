@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import * as clubStore from '../data/clubStore'
 
 /**
@@ -7,6 +7,9 @@ import * as clubStore from '../data/clubStore'
  * `useSyncExternalStore` garantiza que todas las páginas y el panel de
  * administración compartan exactamente el mismo estado y se actualicen al
  * instante cuando se crea, edita o elimina un contenido.
+ *
+ * Al montarse descarga el contenido publicado en el backend, de modo que
+ * cualquier dispositivo ve lo mismo que se guardó desde el panel.
  */
 export function useClubData() {
   const data = useSyncExternalStore(
@@ -15,8 +18,21 @@ export function useClubData() {
     clubStore.getSnapshot,
   )
 
+  const sincronizacion = useSyncExternalStore(
+    clubStore.subscribeSync,
+    clubStore.getSyncSnapshot,
+    clubStore.getSyncSnapshot,
+  )
+
+  useEffect(() => {
+    void clubStore.cargarContenidoRemoto()
+  }, [])
+
   return {
     ...data,
+    sincronizacion,
+    recargarContenido: clubStore.cargarContenidoRemoto,
+    guardarEnServidor: clubStore.guardarEnServidor,
     addNoticia: clubStore.addNoticia,
     updateNoticia: clubStore.updateNoticia,
     deleteNoticia: clubStore.deleteNoticia,

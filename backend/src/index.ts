@@ -21,6 +21,7 @@ import productosRoutes from './routes/productos.js';
 import pedidosRoutes from './routes/pedidos.js';
 import abonadosRoutes from './routes/abonados.js';
 import uploadsRoutes from './routes/uploads.js';
+import contenidoRoutes from './routes/contenido.js';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -84,7 +85,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads')));
 
@@ -108,6 +109,7 @@ app.use('/api/productos', productosRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/abonados', abonadosRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/contenido', contenidoRoutes);
 
 // Manejo de errores global
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

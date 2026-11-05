@@ -252,6 +252,17 @@ export const abonadosSeed: AbonadoItem[] = [
   },
 ]
 
+export interface ConfiguracionSitio {
+  /** Cuántas noticias destacadas se muestran en el carrusel de la portada. */
+  carouselItems: number
+  /** Nombre oficial del club, usado en el encabezado y el pie del sitio. */
+  nombreClub: string
+  /** Año de fundación que se muestra como "Desde 1990". */
+  desde: string
+  /** URL del escudo o logo del club. Vacío = se usa el escudo por defecto. */
+  logoUrl: string
+}
+
 export interface ClubData {
   noticias: NoticiaItem[]
   partidos: PartidoItem[]
@@ -261,9 +272,14 @@ export interface ClubData {
   videos: VideoItem[]
   pedidos: PedidoItem[]
   abonados: AbonadoItem[]
-  config: {
-    carouselItems: number
-  }
+  config: ConfiguracionSitio
+}
+
+export const configuracionSeed: ConfiguracionSitio = {
+  carouselItems: 4,
+  nombreClub: 'Juventud Guacarhue',
+  desde: '1990',
+  logoUrl: '',
 }
 
 export const clubDataSeed: ClubData = {
@@ -275,7 +291,5 @@ export const clubDataSeed: ClubData = {
   videos: videosSeed,
   pedidos: pedidosSeed,
   abonados: abonadosSeed,
-  config: {
-    carouselItems: 4,
-  },
+  config: configuracionSeed,
 }

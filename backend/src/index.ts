@@ -69,6 +69,8 @@ const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+console.log(`🌐 CORS permitido para: ${corsOrigins.join(', ') || '(ninguno)'}`);
+
 app.use(cors({
   origin: (origin, callback) => {
     // Sin cabecera Origin (curl, health checks, mismo origen) se permite.

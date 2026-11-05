@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import Home from './pages/Home'
 import Noticias from './pages/Noticias'
@@ -11,6 +11,7 @@ import Login from './pages/Login'
 import { useAuth } from './hooks/useAuth'
 import { useClubData } from './hooks/useClubData'
 import { resolveMediaUrl } from './lib/api'
+import { sincronizarFavicon } from './lib/favicon'
 
 /**
  * Escudo que se muestra mientras el club no suba su propio logo desde
@@ -26,6 +27,13 @@ function AppContent() {
 
   const logoSrc = resolveMediaUrl(config.logoUrl) || LOGO_POR_DEFECTO
   const desde = config.desde.trim()
+
+  // El favicon de la pestaña debe mostrar el mismo logo que el encabezado.
+  // Se recalcula cuando cambia `config.logoUrl` (por ejemplo, al subir un
+  // logo nuevo desde el panel de administración).
+  useEffect(() => {
+    sincronizarFavicon(logoSrc)
+  }, [logoSrc])
 
   const navLinkClass =
     'px-3 py-6 text-xs sm:text-sm font-semibold tracking-[0.08em] text-white/85 hover:text-white transition-colors'

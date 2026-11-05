@@ -3,20 +3,42 @@
  *
  * En desarrollo Vite redirige `/api` hacia el backend local (ver vite.config.ts).
  * En produccion el frontend se publica como sitio estatico (Vercel) y la API
- * vive en otro dominio (Railway), por lo que hay que definir `VITE_API_URL`
- * con la URL publica del backend, por ejemplo:
+ * vive en otro dominio (Railway), por lo que hay que apuntar a la URL publica
+ * del backend. Ese valor es publico (viaja dentro del bundle), asi que se deja
+ * como respaldo para que el sitio funcione aunque la variable de entorno no
+ * este definida o tenga un valor invalido.
  *
- *   VITE_API_URL=https://juventud-guacarhue-production.up.railway.app/api
+ * Orden de prioridad:
+ *   1. `VITE_API_URL`, solo si es una URL valida (http/https, sin `<>`).
+ *   2. La URL de produccion de Railway (solo en builds de produccion).
+ *   3. `/api` relativo (desarrollo y fallback final).
  */
 
-const RAW_API_URL = (import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')
+/** Backend publico de produccion (Railway). */
+export const PRODUCTION_API_URL = 'https://juventudguacarhue-production.up.railway.app/api'
 
-if (import.meta.env.PROD && !RAW_API_URL) {
-  console.warn(
-    '[api] VITE_API_URL no esta definida en el build. Las llamadas a la API se haran ' +
-      'contra el mismo dominio del sitio (no contra Railway). Define la variable en Vercel y vuelve a desplegar.',
-  )
+/** Valida y normaliza `VITE_API_URL`; devuelve '' si no sirve. */
+function leerApiUrlConfigurada(valor: string | undefined): string {
+  const limpio = (valor ?? '').trim().replace(/\/+$/, '')
+
+  if (!limpio) {
+    return ''
+  }
+
+  if (!/^https?:\/\/[^\s<>]+$/i.test(limpio)) {
+    console.warn(
+      `[api] VITE_API_URL no es una URL valida ("${limpio}"): se ignora y se usa ` +
+        `${import.meta.env.PROD ? PRODUCTION_API_URL : '/api'}.`,
+    )
+    return ''
+  }
+
+  return limpio
 }
+
+const CONFIGURED_API_URL = leerApiUrlConfigurada(import.meta.env.VITE_API_URL)
+const RAW_API_URL =
+  CONFIGURED_API_URL || (import.meta.env.PROD ? PRODUCTION_API_URL : '')
 
 /** URL base de la API. Siempre termina en `/api`. */
 export const API_BASE_URL = RAW_API_URL

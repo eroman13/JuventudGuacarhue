@@ -41,13 +41,122 @@ se resuelven contra `VITE_API_URL`, por eso esa variable es obligatoria en Verce
    `prisma migrate deploy && npm start` (`railway.json` usa `backend/Dockerfile`).
 5. Cada `push` a `main` vuelve a desplegar el backend automáticamente.
 
-### Limitación conocida de los uploads
+### Persistencia de las imágenes subidas (Cloudflare R2 o volumen de Railway)
 
-Las imágenes subidas se guardan en el filesystem del contenedor
-(`backend/public/uploads`) y se sirven en `/uploads/...`. En Railway el
-filesystem es **efímero**: cada redeploy borra las imágenes. Para producción
-estable conviene moverlas a S3 / Cloudflare R2 / Cloudinary (el `.env.example`
-ya lista las variables de AWS).
+Las imágenes que se suben desde el panel (logo, galería, noticias, planteles,
+productos) no viven en la base de datos: en `contenidoSitio` solo queda su URL.
+Antes se escribían en el filesystem del contenedor, que es **efímero**: en cada
+redeploy se crea un contenedor nuevo y `/uploads/...` empieza a responder `404`,
+así que la base seguía apuntando a archivos que ya no existían (por eso el logo
+"se borraba" en cada redeploy).
+
+Hay dos formas de resolverlo; `backend/src/lib/imagenes.ts` soporta las dos y
+elige solo según las variables configuradas:
+
+| | **Opción A: Cloudflare R2** (recomendado) | **Opción B: volumen de Railway** |
+| --- | --- | --- |
+| Dónde quedan | Bucket público, servido por la CDN de Cloudflare | Disco del servicio (`/data/uploads`) |
+| Sobrevive a | redeploys y a cualquier migración de hosting | redeploys (no a borrar/recrear el servicio) |
+| Velocidad | CDN global | solo la región del servicio |
+| Réplicas | cualquiera | una sola (`numReplicas: 1`) |
+| Coste a esta escala | 0 (10 GB y egreso gratis) | ~US$0,25/GB/mes |
+| Trabajo | crear bucket + 5 variables | montar un volumen en el dashboard |
+
+#### Opción A — Cloudflare R2 (recomendado)
+
+Con `R2_BUCKET_IMAGENES` + `R2_URL_IMAGENES` configuradas, la imagen se sube al
+bucket y lo que se guarda en el contenido del sitio es su URL definitiva
+(`https://...`), servida por la CDN con caché de un año. Sin esas variables el
+backend usa el disco (opción B).
+
+1. Cloudflare → **R2** → *Create bucket* (ej. `juventud-guacarhue-fotos`).
+2. Dale una **URL pública**; hay dos caminos y el código funciona con los dos
+   (`R2_URL_IMAGENES` es la URL base, la clave del objeto va pegada al final):
+   - **Dominio propio** (lo correcto): *Settings* → *Public access* → *Custom
+     Domains*, ej. `https://fotos.tudominio.cl`. El DNS de ese dominio tiene que
+     estar en Cloudflare para que valide.
+   - **Subdominio de pruebas**: *Public access* → *R2.dev subdomain* → *Allow*,
+     ej. `https://pub-1a2b3c4d5e.r2.dev`. Funciona al minuto y sin tocar DNS,
+     pero Cloudflare lo marca como **solo para pruebas** (tiene límite de
+     peticiones).
+3. **Manage R2 API Tokens** → *Create API token* con permiso **Object Read &
+   Write**, acotado a ese bucket. Copia el *Access Key ID* y el *Secret Access
+   Key*.
+4. En Railway → **Variables** agrega:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `R2_BUCKET_IMAGENES` | `juventud-guacarhue-fotos` |
+   | `R2_URL_IMAGENES` | `https://fotos.tudominio.cl` (sin barra final) |
+   | `R2_ACCOUNT_ID` | *Account ID* que aparece en la pantalla principal de R2 |
+   | `R2_ACCESS_KEY_ID` | del token del paso 3 |
+   | `R2_SECRET_ACCESS_KEY` | del token del paso 3 |
+   | `R2_ENDPOINT` | opcional; por defecto `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
+
+5. Redeploya y comprueba la vuelta completa (sube un PNG de prueba, **lee su URL
+   pública** y lo borra). Se ejecuta desde tu máquina, con las mismas variables
+   en `backend/.env`:
+
+   ```bash
+   cd backend && npm run r2:probar
+   ```
+
+   Sin esas variables el script solo informa de que está activo el disco, que es
+   lo normal en desarrollo.
+
+Verificación:
+
+- En los *Deploy Logs* debe aparecer
+  `🖼️  Imagenes del panel: Cloudflare R2 (bucket publico)`.
+- Al subir una imagen desde el panel, la respuesta trae una URL
+  `https://fotos.tudominio.cl/uploads/<timestamp>-<nombre>.png` y se ve en el
+  sitio.
+
+> Carga las variables **después** de que el *Custom Domain* diga *Active*. Si el
+> subdominio todavía lo resuelve el comodín del dominio (por ejemplo un `A *` que
+> apunta a Vercel), las imágenes se suben bien pero el visitante las ve rotas;
+> `npm run r2:probar` lo detecta porque esa URL responde HTML en vez del XML del
+> bucket. Las imágenes subidas **antes** de configurar R2 siguen en el disco, así
+> que hay que volver a subirlas (logo incluido) para que queden en el bucket.
+
+#### Opción B — Volumen de Railway (rápido)
+
+Para que las imágenes sobrevivan, monta un **volumen** en el servicio del
+backend:
+
+1. Railway → servicio del backend → **Settings → Volumes → Add Volume**
+   (o `railway volume add`).
+2. Define el **Mount path** como `/data` (sirve cualquier ruta absoluta, por
+   ejemplo `/app/public/uploads`).
+3. Redeploya el servicio.
+
+El backend detecta el volumen automáticamente (`RAILWAY_VOLUME_MOUNT_PATH`) y
+guarda las imágenes en `/data/uploads`. Si prefieres fijar la ruta a mano,
+define esta variable en Railway → **Variables**:
+
+| Variable | Valor |
+| --- | --- |
+| `UPLOAD_DIR` | `/data/uploads` (opcional; tiene prioridad sobre el volumen) |
+
+Orden de resolución de la carpeta de uploads
+(`backend/src/lib/uploadStorage.ts`): `UPLOAD_DIR` →
+`RAILWAY_VOLUME_MOUNT_PATH/uploads` → `backend/public/uploads` (local).
+
+Verificación:
+
+- En los *Deploy Logs* debe aparecer
+  `🖼️  Imagenes del panel: disco local (/data/uploads)`.
+- Sube una imagen desde el panel y comprueba que sigue respondiendo después de
+  un redeploy.
+
+> Un volumen pertenece a un único servicio y no soporta varias réplicas
+> (`railway.json` ya define `numReplicas: 1`), y se pierde si se borra o se
+> recrea el servicio. Sirve para salir del paso; para dejarlo estable (CDN, sin
+> depender de una sola instancia) conviene la **opción A**. En los dos casos hay
+> que **volver a subir** el logo y las imágenes que se perdieron en los redeploys
+> anteriores, porque los registros guardados apuntan a archivos que ya no
+> existen.
+
 
 ---
 
@@ -127,7 +236,7 @@ el problema está en `CORS_ORIGIN` de Railway (variables + redeploy).
 - [ ] `https://<proyecto>.vercel.app/` carga la portada.
 - [ ] Recargar con F5 en `/noticias`, `/galeria` y `/admin` no da 404.
 - [ ] Login en `/login` con el administrador real (no la cuenta demo) entra al panel.
-- [ ] Subir una imagen en el panel devuelve una URL `https://<servicio>.up.railway.app/uploads/...` y se visualiza.
+- [ ] Subir una imagen en el panel devuelve una URL y se visualiza: `https://fotos.tudominio.cl/uploads/...` con R2, o `https://<servicio>.up.railway.app/uploads/...` con disco/volumen.
 - [ ] DevTools → Network: las peticiones van a `...up.railway.app/api/...` y la respuesta incluye `Access-Control-Allow-Origin`.
 - [ ] `/api/health` responde `OK`.
 
@@ -147,8 +256,9 @@ envía los cambios automáticamente al guardar en el panel.
 3. En **Identidad del club** cambia:
    - **Nombre del club** (encabezado y pie del sitio).
    - **Año de fundación** → se muestra como *"Desde 1990"*. Vacío = se oculta.
-   - **Logo o escudo**: pega una URL o usa **Subir imagen** (se sube a
-     `/uploads/` del backend). Vacío = se usa el escudo actual del club.
+   - **Logo o escudo**: pega una URL o usa **Subir imagen** (se sube al bucket
+     de R2 o a `/uploads/` del backend, según la configuración). Vacío = se usa
+     el escudo actual del club.
 4. Pulsa **Guardar Cambios**.
 
 El indicador de la esquina superior derecha del panel dice en qué estado está el
@@ -184,7 +294,9 @@ estaba solo en tu navegador. Para publicarlo:
 | 401 al hacer login | Estás usando las credenciales demo (`admin@example.com` / `ChangeMe123!`) que no existen en Railway | Usar `DEFAULT_ADMIN_*` configurado en Railway |
 | Error CORS en consola | `CORS_ORIGIN` en Railway no incluye el dominio de Vercel | Agregarlo (separado por coma) y redeployar |
 | 404 al recargar `/admin` o `/noticias` | Falta el rewrite SPA o `Root Directory` no es `frontend` | Revisar `frontend/vercel.json` y la configuración del proyecto |
-| Imágenes `/uploads/...` dan 404 | El contenedor se redeployó y borró los archivos, o la URL no apunta al backend | Volver a subirlas y/o migrar a S3/R2 |
+| Imágenes `/uploads/...` dan 404 | Se redeployó sin volumen persistente (ni bucket R2) y se borraron los archivos | Configurar R2 (opción A) o montar el volumen (opción B) y volver a subirlas |
+| Las imágenes se suben pero salen rotas, y su URL responde HTML en vez del archivo | `R2_URL_IMAGENES` apunta a un dominio que no está conectado al bucket (o lo captura el comodín del dominio, por ejemplo hacia Vercel) | Conectar el *Custom Domain* en R2 → *Settings* → *Public access* y comprobar con `npm run r2:probar`; después volver a subir las imágenes afectadas |
+| `POST /api/uploads` responde 500 `No se pudo guardar la imagen…` | R2 configurado pero las credenciales o el bucket fallan (con R2 no hay fallback a disco, a propósito) | `cd backend && npm run r2:probar` y corregir las variables `R2_*` en Railway |
 | Cambio algo en el panel y otro dispositivo no lo ve | El panel muestra `Solo este navegador` (modo demo / sesión expirada) o no se pulsó Guardar | Volver a iniciar sesión con la cuenta real y guardar; comprobar `GET /api/contenido` |
 | Build de Vercel falla con `tsc` | Errores de TypeScript | Ejecutar `cd frontend && npm run build` localmente antes de pushear |
 

@@ -14,10 +14,12 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "db:estado": "prisma migrate status",
+    "r2:probar": "tsx scripts/probar-r2.ts",
     "lint": "eslint src --ext ts",
     "test": "node --import tsx --test test/**/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1163.0",
     "@prisma/client": "5.7.1",
     "bcryptjs": "2.4.3",
     "cors": "2.8.5",
@@ -44,6 +46,6 @@
     "typescript": "5.3.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

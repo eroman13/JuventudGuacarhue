@@ -3,8 +3,6 @@ import cors from 'cors';
 import 'express-async-errors';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { PrismaClient, UserRole } from '@prisma/client';
 
 // Cargar variables de entorno
@@ -22,11 +20,11 @@ import pedidosRoutes from './routes/pedidos.js';
 import abonadosRoutes from './routes/abonados.js';
 import uploadsRoutes from './routes/uploads.js';
 import contenidoRoutes from './routes/contenido.js';
+import { ensureUploadDir } from './lib/uploadStorage.js';
+import { modoImagenes } from './lib/imagenes.js';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const prisma = new PrismaClient();
 
 const DEFAULT_ADMIN = {
@@ -72,6 +70,16 @@ const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
 
 console.log(`🌐 CORS permitido para: ${corsOrigins.join(', ') || '(ninguno)'}`);
 
+// Donde terminan las imagenes del panel: bucket de R2 o disco. Verlo en los
+// Deploy Logs es lo que permite detectar que se desplego sin bucket ni volumen.
+const uploadDir = ensureUploadDir();
+
+console.log(
+  `🖼️  Imagenes del panel: ${
+    modoImagenes() === 'r2' ? 'Cloudflare R2 (bucket publico)' : `disco local (${uploadDir})`
+  }`,
+);
+
 app.use(cors({
   origin: (origin, callback) => {
     // Sin cabecera Origin (curl, health checks, mismo origen) se permite.
@@ -87,7 +95,11 @@ app.use(cors({
 
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.resolve(__dirname, '../public/uploads')));
+
+// Imagenes subidas desde el panel. La carpeta se resuelve en uploadStorage
+// (UPLOAD_DIR / volumen de Railway / public/uploads) para que escritura y
+// lectura apunten siempre al mismo lugar.
+app.use('/uploads', express.static(uploadDir));
 
 // Rutas de salud
 app.get('/health', (req: Request, res: Response) => {

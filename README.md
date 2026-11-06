@@ -35,7 +35,7 @@ Plataforma web completa para el club deportivo Juventud Guacarhue con sistema de
 - **PostgreSQL** - Base de datos
 - **JWT** - Autenticación
 - **Bcryptjs** - Hash de contraseñas
-- **AWS S3/Cloudflare R2** - Almacenamiento de archivos
+- **Cloudflare R2** - Almacenamiento de las imágenes subidas (compatible con S3)
 - **Docker** - Contenedorización
 
 ## 📦 Estructura del Proyecto
@@ -67,7 +67,7 @@ JuventudGuacarhue/
 ## 🚀 Inicio Rápido
 
 ### Requisitos
-- Node.js 18+
+- Node.js 20+
 - npm o yarn
 - PostgreSQL 13+
 

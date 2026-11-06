@@ -280,7 +280,11 @@ export async function uploadImageFile(file: File): Promise<string> {
   })
 
   if (!response.ok) {
-    throw new Error('No se pudo subir la imagen al servidor.')
+    // El backend explica el motivo (formato no permitido, imagen de mas de 5 MB,
+    // almacenamiento sin configurar). Sin leerlo, el panel solo decia "no se pudo
+    // subir" y no habia forma de saber que habia que cambiar.
+    const detalle = (await response.json().catch(() => null)) as { error?: string } | null
+    throw new Error(detalle?.error || 'No se pudo subir la imagen al servidor.')
   }
 
   const payload = (await response.json()) as { url?: string }

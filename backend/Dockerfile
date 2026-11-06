@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -18,6 +18,10 @@ COPY tsconfig.json ./
 
 # Build
 RUN npm run build && npm run prisma:generate
+
+# Carpeta de uploads: en Railway el volumen montado la reemplaza, asi la
+# imagen ya trae el punto de montaje creado.
+RUN mkdir -p public/uploads
 
 # Limpiar cache de npm
 RUN npm cache clean --force

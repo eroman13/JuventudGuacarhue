@@ -4,10 +4,14 @@ Esta carpeta es la bandeja de entrada: dejas aquí las fotos y un archivo
 `noticias.json`, y el script las sube al almacenamiento del sitio (Cloudflare R2
 en producción) y crea las noticias y las fotos de galería.
 
-Las fotos **tienen que estar en este equipo**. No se pueden enlazar desde
-Facebook: los enlaces del CDN (`scontent-*.fbcdn.net`) caducan y responden
-`403`, así que en el sitio se verían rotas — es justo el problema que tienen hoy
-las noticias y la galería antiguas.
+Las fotos **tienen que estar en este equipo** (o bajarse a esta carpeta). No se
+pueden enlazar desde Facebook: los enlaces del CDN (`scontent-*.fbcdn.net`)
+caducan y responden `403`, así que en el sitio se verían rotas — es justo el
+problema que tenían las noticias y la galería antiguas.
+
+Hay dos caminos: bajarlas a mano (paso 1) o dejar que el script se traiga las
+publicaciones con un token de página (paso 1b, recomendado si eres administrador
+de la página del club).
 
 ## 1. Bajar las fotos de la página del club
 
@@ -25,6 +29,58 @@ Notas:
   backend). Si una pesa más, redúcela antes (Vista Previa → *Herramientas* →
   *Ajustar tamaño*).
 - El texto de cada publicación se copia del post y se pega en el manifiesto.
+
+## 1b. Automatizarlo (token de la página)
+
+Lo de arriba es a mano. Si prefieres que el sitio se traiga solo las últimas
+publicaciones, se puede — pero hace falta un **token de página**, porque
+Facebook no entrega nada a un programa que no esté logueado (contesta `400`, y
+la Graph API responde `Object ... does not exist, cannot be loaded due to
+missing permissions`).
+
+Sacarlo lleva dos minutos y hay que ser administrador de la página:
+
+1. `https://developers.facebook.com/apps` → **Crear app** → tipo *Otro* →
+   *Empresa*.
+2. `https://developers.facebook.com/tools/explorer` → elige la app → **Agregar
+   permisos**: `pages_show_list` y `pages_read_engagement` → **Generate Access
+   Token** y autoriza tu cuenta.
+3. En el desplegable *User or Page* de la izquierda elige la página del club. El
+   token que aparece es el **Page Access Token** (dura ~60 días).
+4. Pégalo en `backend/.env`:
+
+```bash
+FB_PAGE_TOKEN=EAAG...
+FB_PAGE_ID=          # opcional: si lo dejas vacío se lee del token
+```
+
+Y después:
+
+```bash
+npm run facebook:sincronizar                  # baja textos y fotos a importar/facebook/
+npm run facebook:sincronizar -- --publicar    # y además lo publica en el sitio
+```
+
+Qué hace:
+
+- Lee las últimas 10 publicaciones (`--limite=30` para más, `--desde=2026-01-01`
+  para un rango).
+- Baja las fotos a `importar/facebook/` con nombre estable
+  (`fb-<publicación>-<n>.jpg`), así que una segunda pasada no vuelve a subir
+  nada.
+- Escribe `importar/facebook/noticias.json` y lo publica con el importador.
+- El titular es la primera línea del post (sin hashtags, enlaces ni emojis), el
+  cuerpo va como párrafos y la categoría se adivina por palabra clave
+  (`Resultados`, `Fichajes`, `Fixtures`, `Instalaciones`, `Lesiones`,
+  `Institucional`).
+- Una publicación **sólo de fotos** va entera a la galería, y las fotos extra de
+  una publicación con texto también (la primera es la portada).
+- Si el título ya está en el sitio, actualiza esa noticia en vez de duplicarla
+  (se apoya en el `id`).
+
+Revisa el `noticias.json` generado antes de publicar: los títulos y las
+categorías son lo único que conviene corregir a mano. Si el token expira, el
+script lo dice (código 190) y basta con generar otro.
 
 ## 2. Escribir `noticias.json`
 

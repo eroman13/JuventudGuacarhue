@@ -16,6 +16,7 @@
     "db:estado": "prisma migrate status",
     "r2:probar": "tsx scripts/probar-r2.ts",
     "importar": "tsx scripts/importar-contenido.ts",
+    "facebook:sincronizar": "tsx scripts/sincronizar-facebook.ts",
     "imagenes:revisar": "tsx scripts/revisar-imagenes.ts",
     "lint": "eslint src --ext ts",
     "test": "node --import tsx --test test/*.test.ts"

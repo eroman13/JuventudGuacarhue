@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import Home from './pages/Home'
 import Noticias from './pages/Noticias'
@@ -15,18 +15,35 @@ import { resolveMediaUrl } from './lib/api'
 import { sincronizarFavicon } from './lib/favicon'
 
 /**
- * Escudo que se muestra mientras el club no suba su propio logo desde
- * Panel de administración → Configuración → Identidad del club.
+ * Escudo de respaldo: las iniciales del club en un círculo.
+ *
+ * Antes acá había una URL de una foto del escudo alojada en Facebook (`fbcdn`),
+ * pero esas URLs llevan un token que **caduca**: hoy responden `403`, así que el
+ * encabezado mostraba una imagen rota. El logo real se sube desde
+ * Panel de administración → Configuración → Identidad del club (queda en el
+ * bucket de R2); mientras no haya uno, se ven las iniciales.
  */
-const LOGO_POR_DEFECTO =
-  'https://scontent-scl3-1.xx.fbcdn.net/v/t39.30808-6/798084742_4698571657134149_5053335982381798469_n.jpg?stp=dst-jpg_tt6&cstp=mx1254x1254&ctp=s1254x1254&_nc_cat=104&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=Q7Y0EpyRejIQ7kNvwHCgx0F&_nc_oc=Adp9k1FiFQbCUIRYx2mLCEsHqv5Z62uAPqPl-EEmxI0xraaV1SvwaEOf8OwTkW4mhEoGTXXT_pkUMjMbX7KuvzvQ&_nc_zt=23&_nc_ht=scontent-scl3-1.xx&_nc_gid=AMH9LOpBdGp838RAhpQpuw&_nc_ss=7b2a8&oh=00_AQQDdaz7huBzJ2a_nxDDrS05blhfj-9LuCpoABEqvRDtrg&oe=6AEAA16F'
+function inicialesDe(nombreClub: string): string {
+  const iniciales = nombreClub
+    .split(/\s+/)
+    .map((palabra) => palabra.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  return iniciales || 'JG'
+}
 
 function AppContent() {
   const { user, isLoggedIn, logout } = useAuth()
   const { config } = useClubData()
-  const fallbackLogoRef = useRef<HTMLDivElement | null>(null)
+  const [logoRoto, setLogoRoto] = useState<string | null>(null)
 
-  const logoSrc = resolveMediaUrl(config.logoUrl) || LOGO_POR_DEFECTO
+  // Se guarda la URL que falló (no un simple booleano) para que al subir un logo
+  // nuevo se vuelva a intentar sin recargar la página.
+  const logoResuelto = resolveMediaUrl(config.logoUrl)
+  const mostrarLogo = logoResuelto !== '' && logoRoto !== logoResuelto
+  const logoSrc = mostrarLogo ? logoResuelto : ''
   const desde = config.desde.trim()
 
   // El favicon de la pestaña debe mostrar el mismo logo que el encabezado.
@@ -54,25 +71,22 @@ function AppContent() {
           <nav className="border-t border-white/10">
             <div className="container-max-width flex items-center justify-between">
               <Link to="/" className="flex items-center gap-3 py-4">
-                <img
-                  key={logoSrc}
-                  src={logoSrc}
-                  alt={`Escudo ${config.nombreClub}`}
-                  className="h-12 w-12 rounded-full border-2 border-blue-300 bg-blue-900 object-cover"
-                  onError={(event) => {
-                    const target = event.currentTarget
-                    target.classList.add('hidden')
-                    if (fallbackLogoRef.current) {
-                      fallbackLogoRef.current.classList.remove('hidden')
-                    }
-                  }}
-                />
-                <div
-                  ref={fallbackLogoRef}
-                  className="hidden h-12 w-12 items-center justify-center rounded-full border-2 border-blue-300 bg-blue-900 text-xs font-extrabold tracking-widest text-blue-300"
-                >
-                  JG
-                </div>
+                {mostrarLogo ? (
+                  <img
+                    key={logoResuelto}
+                    src={logoResuelto}
+                    alt={`Escudo ${config.nombreClub}`}
+                    className="h-12 w-12 rounded-full border-2 border-blue-300 bg-blue-900 object-cover"
+                    onError={() => setLogoRoto(logoResuelto)}
+                  />
+                ) : (
+                  <div
+                    aria-hidden="true"
+                    className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-blue-300 bg-blue-900 text-xs font-extrabold tracking-widest text-blue-300"
+                  >
+                    {inicialesDe(config.nombreClub)}
+                  </div>
+                )}
                 <div className="leading-tight">
                   <div className="text-sm font-bold uppercase tracking-[0.18em]">{config.nombreClub}</div>
                   {desde && (

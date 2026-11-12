@@ -1,0 +1,23 @@
+{
+  "_ayuda": "Copia este archivo como noticias.json y completa los datos. Cada 'imagen'/'archivo' debe ser el nombre de un archivo que este en esta misma carpeta (JPG/PNG/WebP, maximo 5 MB). 'fecha' va en formato AAAA-MM-DD. El contenido admite HTML.",
+
+  "noticias": [
+    {
+      "titulo": "EJEMPLO - borra esta entrada antes de importar",
+      "imagen": "ejemplo-noticia.jpg",
+      "fecha": "2026-11-12",
+      "categoria": "Resultados",
+      "extracto": "Frase corta que se ve en la portada, bajo el titulo.",
+      "contenido": "<p>Primer parrafo de la noticia.</p><p>Segundo parrafo.</p>",
+      "destacada": false
+    }
+  ],
+
+  "galeria": [
+    {
+      "archivo": "ejemplo-galeria.jpg",
+      "fecha": "2026-11-12",
+      "categoria": "Partidos"
+    }
+  ]
+}

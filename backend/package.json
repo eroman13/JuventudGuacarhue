@@ -15,8 +15,10 @@
     "prisma:studio": "prisma studio",
     "db:estado": "prisma migrate status",
     "r2:probar": "tsx scripts/probar-r2.ts",
+    "importar": "tsx scripts/importar-contenido.ts",
+    "imagenes:revisar": "tsx scripts/revisar-imagenes.ts",
     "lint": "eslint src --ext ts",
-    "test": "node --import tsx --test test/**/*.test.ts"
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1163.0",

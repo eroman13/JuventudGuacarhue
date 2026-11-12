@@ -300,6 +300,32 @@ estaba solo en tu navegador. Para publicarlo:
 2. Ve a **Configuración** y pulsa **Guardar Cambios** (o edita cualquier cosa).
 3. El indicador debe pasar a `Contenido en el servidor`.
 
+### Pasar al sitio las fotos de Facebook
+
+Las fotos enlazadas desde Facebook (`scontent-*.fbcdn.net`) **no funcionan** en el
+sitio: son enlaces firmados que caducan y responden `403`. Por eso las noticias y
+la galería antiguas muestran imágenes rotas. Hay que subirlas a nuestro
+almacenamiento (R2) y guardar esa URL.
+
+Para ver qué está roto ahora mismo:
+
+```bash
+cd backend
+npm run imagenes:revisar
+```
+
+Y para subir fotos en bloque (en vez de una a una desde el panel):
+
+1. Descarga las fotos desde la página del club y déjalas en `backend/importar/`.
+2. Completa `backend/importar/noticias.json` (parte de `noticias.ejemplo.json`;
+   detalle en `backend/importar/LEEME.md`).
+3. `npm run importar` para simular y `npm run importar -- --publicar` para subir
+   de verdad (`ADMIN_EMAIL` / `ADMIN_PASSWORD` o `--email` / `--password`).
+
+El script sube cada imagen con `POST /api/uploads` y guarda el contenido con
+`PUT /api/contenido`. Es idempotente: no duplica noticias por título ni fotos ya
+presentes en la galería.
+
 ---
 
 ## 4. Problemas comunes

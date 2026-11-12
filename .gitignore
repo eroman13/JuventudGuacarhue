@@ -44,3 +44,7 @@ prisma/migrations/
 # Uploads
 public/uploads/
 backend/public/uploads/
+# Fotos que se importan al sitio (pesan y son material del club, no van al repo)
+backend/importar/*
+!backend/importar/LEEME.md
+!backend/importar/noticias.ejemplo.json

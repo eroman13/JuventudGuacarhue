@@ -79,6 +79,22 @@ backend usa el disco (opción B).
      ej. `https://pub-1a2b3c4d5e.r2.dev`. Funciona al minuto y sin tocar DNS,
      pero Cloudflare lo marca como **solo para pruebas** (tiene límite de
      peticiones).
+
+   > **¿De dónde sale `tudominio.cl`?** Es un nombre que hay que **registrar y
+   > pagar** aparte, igual que el arriendo de una dirección: para `.cl` se compra
+   > en [NIC Chile](https://www.nic.cl) (unos CLP 10.000 al año) y queda a nombre
+   > de la persona o del club. Cloudflare **no** regala dominios: solo aloja el
+   > DNS de uno que ya tengas (plan gratis) para poder crear subdominios como
+   > `fotos.tudominio.cl`.
+   >
+   > Ojo: la URL que hoy tiene el sitio, `https://juventud-guacarhue.vercel.app`,
+   > **no sirve para esto**, porque `vercel.app` no es del club (Vercel presta ese
+   > subdominio y no se puede mover a Cloudflare). Si el club todavía no tiene
+   > dominio propio, **usa el subdominio `r2.dev`**: no requiere dominio, DNS ni
+   > gasto. Cuando lo compren, basta con crear el *Custom Domain* y actualizar
+   > `R2_URL_IMAGENES`; las imágenes nuevas usarán el dominio propio y las
+   > anteriores seguirán funcionando con su URL `r2.dev` mientras ese subdominio
+   > esté activo.
 3. **Manage R2 API Tokens** → *Create API token* con permiso **Object Read &
    Write**, acotado a ese bucket. Copia el *Access Key ID* y el *Secret Access
    Key*.
@@ -296,6 +312,7 @@ estaba solo en tu navegador. Para publicarlo:
 | 404 al recargar `/admin` o `/noticias` | Falta el rewrite SPA o `Root Directory` no es `frontend` | Revisar `frontend/vercel.json` y la configuración del proyecto |
 | Imágenes `/uploads/...` dan 404 | Se redeployó sin volumen persistente (ni bucket R2) y se borraron los archivos | Configurar R2 (opción A) o montar el volumen (opción B) y volver a subirlas |
 | Las imágenes se suben pero salen rotas, y su URL responde HTML en vez del archivo | `R2_URL_IMAGENES` apunta a un dominio que no está conectado al bucket (o lo captura el comodín del dominio, por ejemplo hacia Vercel) | Conectar el *Custom Domain* en R2 → *Settings* → *Public access* y comprobar con `npm run r2:probar`; después volver a subir las imágenes afectadas |
+| La URL `pub-….r2.dev` responde **401** en el navegador | El subdominio de pruebas está **deshabilitado** en ese bucket | R2 → el bucket → *Settings* → *Public access* → *R2.dev subdomain* → **Enable**. Con el subdominio activo, una clave inexistente responde **404** (normal); `npm run r2:probar` distingue los dos casos |
 | `POST /api/uploads` responde 500 `No se pudo guardar la imagen…` | R2 configurado pero las credenciales o el bucket fallan (con R2 no hay fallback a disco, a propósito) | `cd backend && npm run r2:probar` y corregir las variables `R2_*` en Railway |
 | Cambio algo en el panel y otro dispositivo no lo ve | El panel muestra `Solo este navegador` (modo demo / sesión expirada) o no se pulsó Guardar | Volver a iniciar sesión con la cuenta real y guardar; comprobar `GET /api/contenido` |
 | Build de Vercel falla con `tsc` | Errores de TypeScript | Ejecutar `cd frontend && npm run build` localmente antes de pushear |

@@ -189,7 +189,7 @@ export function urlDeImagen(clave: string): string {
 }
 
 /**
- * ¿La URL publica configurada es el subdominio de pruebas de R2 (`*.r2.dev`)?
+ * ¿La URL es el subdominio de pruebas de R2 (`*.r2.dev`)?
  *
  * Cloudflare lo llama *R2.dev subdomain* y lo marca como **solo para pruebas**:
  * tiene limite de peticiones y no ofrece garantias de servicio. El codigo
@@ -197,17 +197,22 @@ export function urlDeImagen(clave: string): string {
  * tocar el DNS; antes de darlo por definitivo conviene conectar un dominio
  * propio (*Settings* -> *Public access* -> *Custom Domains*).
  */
-export function urlPublicaDeDesarrollo(): boolean {
-  const cfg = leerConfig();
-  if (!cfg) return false;
-
+function esDominioR2Dev(url: string): boolean {
   try {
-    return new URL(cfg.url).hostname.endsWith('.r2.dev');
+    return new URL(url).hostname.endsWith('.r2.dev');
   } catch {
     // URL sin esquema (`fotos.tudominio.cl`): no es r2.dev y `npm run r2:probar`
     // lo va a decir al intentar leerla.
     return false;
   }
+}
+
+/** ¿La URL publica configurada es el subdominio de pruebas `*.r2.dev`? */
+export function urlPublicaDeDesarrollo(): boolean {
+  const cfg = leerConfig();
+  if (!cfg) return false;
+
+  return esDominioR2Dev(cfg.url);
 }
 
 /** ¿Estamos en produccion? (ahi el disco no basta: no se comparte entre replicas). */
@@ -296,6 +301,10 @@ export async function borrarImagen(clave: string): Promise<void> {
  * otra web —por ejemplo al comodin del dominio que manda todo a Vercel— contesta
  * **HTML**.
  *
+ * La excepcion es el subdominio de pruebas `*.r2.dev`: Cloudflare contesta ahi con
+ * **su propia pagina HTML**, asi que se mira el codigo (404 = la clave no existe,
+ * que es lo esperado; 401/403 = subdominio deshabilitado).
+ *
  * Importa porque este fallo es invisible desde el resto del sistema: la subida
  * funciona, el objeto se guarda y la URL se arma bien, pero el visitante ve una
  * imagen rota (y la CDN la cachea un anio).
@@ -311,6 +320,23 @@ export async function revisarUrlPublica(
     const tipo = (respuesta.headers.get('content-type') || '').toLowerCase();
 
     if (tipo.includes('text/html')) {
+      // El subdominio de pruebas de R2 contesta **su propia pagina HTML** de
+      // error, asi que ahi el HTML no significa «otra web»: 404 es una clave que
+      // no existe (normal, la que se pide es de prueba) y 401/403 es que el
+      // subdominio `r2.dev` esta deshabilitado.
+      if (esDominioR2Dev(url)) {
+        if (respuesta.status === 401 || respuesta.status === 403) {
+          return {
+            ok: false,
+            motivo:
+              'el subdominio r2.dev esta deshabilitado (HTTP ' +
+              `${respuesta.status}); activalo en R2 -> el bucket -> Settings -> Public access -> R2.dev subdomain`,
+          };
+        }
+
+        return { ok: true, motivo: null };
+      }
+
       return {
         ok: false,
         motivo: `ese dominio responde una pagina web (HTTP ${respuesta.status}), no el bucket`,

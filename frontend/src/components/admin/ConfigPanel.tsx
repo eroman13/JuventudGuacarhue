@@ -172,6 +172,18 @@ export default function ConfigPanel({ notify }: ConfigPanelProps) {
               {subiendoLogo ? 'Subiendo...' : 'Subir imagen'}
             </button>
 
+            {/* El botón principal del panel está al final de la página, en la
+                tarjeta del carrusel, y al subir el logo nadie lo encontraba: se
+                repetía aquí para no tener que bajar. */}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={subiendoLogo}
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              Guardar cambios
+            </button>
+
             {logoUrl.trim() !== '' && (
               <button
                 type="button"
@@ -192,7 +204,7 @@ export default function ConfigPanel({ notify }: ConfigPanelProps) {
           </div>
 
           <p className="mt-1 text-xs text-slate-500">
-            Si lo dejas vacío se sigue usando el escudo actual del club.
+            Si lo dejas vacío se muestran las iniciales del club en lugar del logo.
           </p>
 
           <div className="mt-4 flex items-center gap-3 rounded-lg bg-blue-950 p-4 text-white">

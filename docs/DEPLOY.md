@@ -273,8 +273,8 @@ envía los cambios automáticamente al guardar en el panel.
    - **Nombre del club** (encabezado y pie del sitio).
    - **Año de fundación** → se muestra como *"Desde 1990"*. Vacío = se oculta.
    - **Logo o escudo**: pega una URL o usa **Subir imagen** (se sube al bucket
-     de R2 o a `/uploads/` del backend, según la configuración). Vacío = se usa
-     el escudo actual del club.
+     de R2 o a `/uploads/` del backend, según la configuración). Vacío = se
+     muestran las iniciales del club.
 4. Pulsa **Guardar Cambios**.
 
 El indicador de la esquina superior derecha del panel dice en qué estado está el

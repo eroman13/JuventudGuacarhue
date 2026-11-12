@@ -30,7 +30,15 @@ function recorrer(valor: unknown, ruta: string, hallazgos: Hallazgo[]): void {
   if (typeof valor === 'string') {
     if (/^https?:\/\//i.test(valor)) {
       hallazgos.push({ ruta, contexto: '', url: valor });
+      return;
     }
+
+    // El campo `contenido` de las noticias guarda HTML: las imagenes que pega
+    // el editor tambien se revisan.
+    for (const encontrado of valor.matchAll(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/gi)) {
+      hallazgos.push({ ruta: `${ruta} (HTML)`, contexto: '', url: encontrado[1] });
+    }
+
     return;
   }
 

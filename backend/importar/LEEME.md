@@ -32,6 +32,7 @@ Copia `noticias.ejemplo.json` a `noticias.json` y edítalo. Cada noticia:
 
 | Campo       | Obligatorio | Qué es                                                    |
 | ----------- | ----------- | --------------------------------------------------------- |
+| `id`        | no          | Si es una noticia que **ya existe**, la actualiza en vez de crear una copia |
 | `titulo`    | sí          | Título de la noticia                                      |
 | `imagen`    | sí          | Nombre del archivo en esta carpeta, o una URL ya publicada |
 | `fecha`     | sí          | `AAAA-MM-DD`                                              |
@@ -41,7 +42,25 @@ Copia `noticias.ejemplo.json` a `noticias.json` y edítalo. Cada noticia:
 | `destacada` | no          | `true` para que salga en el carrusel de la portada        |
 
 Y las fotos sueltas de la galería van en `galeria`, con `archivo`, `fecha` y
-`categoria` (`Partidos`, `Entrenamientos`, `Eventos`…).
+`categoria` (`Partidos`, `Entrenamientos`, `Eventos`…). Los productos de la
+tienda van en `productos`, con `nombre`, `imagen`, `precio`, `categoria` y
+`stock` (cualquiera de ellos se puede actualizar con `id`).
+
+Los campos que no pongas se conservan al actualizar: una entrada que solo cambia
+la foto no borra el texto ni la categoría.
+
+### Marcadores de posición
+
+Las imágenes que hoy tiene el sitio (`noticia-1.jpg` … `producto-3.jpg`) son
+marcadores generados con los colores del club, puestos para que no queden
+imágenes rotas. Para cambiarlos por fotos reales:
+
+1. Guarda la foto real en esta carpeta **con el mismo nombre** (`noticia-1.jpg`).
+2. `npm run importar -- --publicar`
+
+El script detecta que el archivo cambió, lo sube otra vez y actualiza la noticia
+(o la foto de galería) en su sitio. No hace falta tocar el `id`.
+
 
 ## 3. Ejecutar
 

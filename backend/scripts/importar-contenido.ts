@@ -20,17 +20,20 @@
  * recuerda en `importar/.importado.json` las fotos que ya subio.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   esFechaValida,
   fusionarGaleria,
   fusionarNoticias,
+  fusionarProductos,
   validarEntrada,
+  validarProducto,
   type DocumentoContenido,
   type EntradaGaleria,
   type EntradaLista,
   type EntradaNoticia,
+  type EntradaProducto,
 } from '../src/lib/importar.js';
 
 const API_POR_DEFECTO = 'https://juventudguacarhue-production.up.railway.app/api';
@@ -49,6 +52,7 @@ const TIPOS: Record<string, string> = {
 interface Manifiesto {
   noticias?: EntradaNoticia[];
   galeria?: EntradaGaleria[];
+  productos?: EntradaProducto[];
 }
 
 interface Opciones {
@@ -97,6 +101,9 @@ Opciones:
 
 En "imagen" puedes poner el nombre de un archivo de la carpeta o una URL que ya
 este publicada (por ejemplo, una imagen del propio sitio).
+
+Si pones "id" en una noticia (o en una foto de la galeria) que ya existe, se
+actualiza en vez de crear una copia. Es la forma de cambiar una portada.
 Ver importar/LEEME.md para el manifiesto completo.
 `);
 }
@@ -157,8 +164,14 @@ async function guardarDocumento(
 
 
 
-/** Fotos ya subidas en ejecuciones anteriores: archivo -> URL. */
-function leerCache(carpeta: string): Record<string, string> {
+/** Fotos ya subidas en ejecuciones anteriores: archivo -> subida. */
+interface Subida {
+  url: string;
+  bytes: number;
+  mtimeMs: number;
+}
+
+function leerCache(carpeta: string): Record<string, Subida> {
   const ruta = path.join(carpeta, '.importado.json');
 
   if (!existsSync(ruta)) {
@@ -166,40 +179,55 @@ function leerCache(carpeta: string): Record<string, string> {
   }
 
   try {
-    return JSON.parse(readFileSync(ruta, 'utf8')) as Record<string, string>;
+    const crudo = JSON.parse(readFileSync(ruta, 'utf8')) as Record<string, string | Subida>;
+    const cache: Record<string, Subida> = {};
+
+    for (const [archivo, valor] of Object.entries(crudo)) {
+      // Formato viejo (solo la URL): se sube otra vez, no cuesta nada.
+      cache[archivo] = typeof valor === 'string' ? { url: valor, bytes: -1, mtimeMs: -1 } : valor;
+    }
+
+    return cache;
   } catch {
     return {};
   }
 }
 
-function guardarCache(carpeta: string, cache: Record<string, string>): void {
+function guardarCache(carpeta: string, cache: Record<string, Subida>): void {
   writeFileSync(path.join(carpeta, '.importado.json'), `${JSON.stringify(cache, null, 2)}\n`);
 }
 
 /**
  * Devuelve la URL publica de una foto: la sube al mismo almacenamiento que usa
  * el panel (`POST /api/uploads`) y recuerda el resultado para no repetirla.
+ *
+ * Si el archivo cambia (misma ruta, otra foto), se vuelve a subir: asi se
+ * reemplazan los marcadores de posicion por las fotos reales.
  */
 async function subirFoto(
   api: string,
   carpeta: string,
   archivo: string,
-  cache: Record<string, string>,
+  cache: Record<string, Subida>,
   publicar: boolean,
 ): Promise<string> {
   if (/^https?:\/\//i.test(archivo)) {
     return archivo;
   }
 
-  if (cache[archivo]) {
-    console.log(`   · ya subida antes, se reutiliza: ${archivo}`);
-    return cache[archivo];
-  }
-
   const ruta = path.join(carpeta, archivo);
 
   if (!existsSync(ruta)) {
     throw new Error(`No existe el archivo "${archivo}" en ${carpeta}.`);
+  }
+
+  const info = statSync(ruta);
+  const mtimeMs = Math.trunc(info.mtimeMs);
+  const subida = cache[archivo];
+
+  if (subida && subida.bytes === info.size && subida.mtimeMs === mtimeMs) {
+    console.log(`   · ya subida antes, se reutiliza: ${archivo}`);
+    return subida.url;
   }
 
   if (!publicar) {
@@ -235,9 +263,33 @@ async function subirFoto(
     );
   }
 
-  cache[archivo] = cuerpo.url;
+  cache[archivo] = { url: cuerpo.url, bytes: info.size, mtimeMs };
   console.log(`   · subida: ${archivo} -> ${cuerpo.url}`);
   return cuerpo.url;
+}
+
+/** Sube la imagen de cada entrada y devuelve la lista con su URL definitiva. */
+async function subirLista<T extends object>(
+  opciones: Opciones,
+  cache: Record<string, Subida>,
+  entradas: T[],
+  campo: 'imagen' | 'archivo',
+): Promise<Array<EntradaLista<T>>> {
+  const listas: Array<EntradaLista<T>> = [];
+
+  for (const entrada of entradas) {
+    const archivo = String((entrada as Record<string, unknown>)[campo] ?? '').trim();
+    const urlImagen = await subirFoto(
+      opciones.api,
+      opciones.carpeta,
+      archivo,
+      cache,
+      opciones.publicar,
+    );
+    listas.push({ entrada, urlImagen, archivo });
+  }
+
+  return listas;
 }
 
 async function main(): Promise<void> {
@@ -277,9 +329,10 @@ async function main(): Promise<void> {
 
   const noticias = manifiesto.noticias ?? [];
   const galeria = manifiesto.galeria ?? [];
+  const productos = manifiesto.productos ?? [];
 
-  if (noticias.length === 0 && galeria.length === 0) {
-    console.log('\nℹ️  El manifiesto no tiene noticias ni fotos.');
+  if (noticias.length === 0 && galeria.length === 0 && productos.length === 0) {
+    console.log('\nℹ️  El manifiesto no tiene noticias, fotos ni productos.');
     return;
   }
 
@@ -302,6 +355,13 @@ async function main(): Promise<void> {
       problemas.push(
         `galeria[${indice}] "${entrada.archivo ?? ''}": la fecha "${entrada.fecha ?? ''}" no es valida`,
       );
+    }
+  });
+
+  productos.forEach((entrada, indice) => {
+    const errores = validarProducto(entrada);
+    if (errores.length > 0) {
+      problemas.push(`productos[${indice}] "${entrada.nombre ?? 'sin nombre'}": ${errores.join(', ')}`);
     }
   });
 
@@ -338,31 +398,9 @@ async function main(): Promise<void> {
   const cache = leerCache(opciones.carpeta);
 
   console.log('\n🖼️  Fotos');
-  const listasNoticias: Array<EntradaLista<EntradaNoticia>> = [];
-  for (const entrada of noticias) {
-    const archivo = (entrada.imagen ?? '').trim();
-    const urlImagen = await subirFoto(
-      opciones.api,
-      opciones.carpeta,
-      archivo,
-      cache,
-      opciones.publicar,
-    );
-    listasNoticias.push({ entrada, urlImagen, archivo });
-  }
-
-  const listasGaleria: Array<EntradaLista<EntradaGaleria>> = [];
-  for (const entrada of galeria) {
-    const archivo = (entrada.archivo ?? '').trim();
-    const urlImagen = await subirFoto(
-      opciones.api,
-      opciones.carpeta,
-      archivo,
-      cache,
-      opciones.publicar,
-    );
-    listasGaleria.push({ entrada, urlImagen, archivo });
-  }
+  const listasNoticias = await subirLista(opciones, cache, noticias, 'imagen');
+  const listasGaleria = await subirLista(opciones, cache, galeria, 'archivo');
+  const listasProductos = await subirLista(opciones, cache, productos, 'imagen');
 
   if (opciones.publicar) {
     guardarCache(opciones.carpeta, cache);
@@ -370,15 +408,23 @@ async function main(): Promise<void> {
 
   const resultadoNoticias = fusionarNoticias(documento, listasNoticias);
   const resultadoGaleria = fusionarGaleria(documento, listasGaleria);
+  const resultadoProductos = fusionarProductos(documento, listasProductos);
 
   console.log('\n📰 Noticias');
   for (const noticia of resultadoNoticias.agregadas) {
     console.log(`   + [${noticia.id}] ${noticia.titulo} (${noticia.fecha}, ${noticia.categoria})`);
   }
+  for (const noticia of resultadoNoticias.actualizadas) {
+    console.log(`   ~ [${noticia.id}] ${noticia.titulo} (actualizada)`);
+  }
   for (const omitida of resultadoNoticias.omitidas) {
     console.log(`   = ${omitida.titulo}: ${omitida.motivo}`);
   }
-  if (resultadoNoticias.agregadas.length === 0 && resultadoNoticias.omitidas.length === 0) {
+  if (
+    resultadoNoticias.agregadas.length === 0 &&
+    resultadoNoticias.actualizadas.length === 0 &&
+    resultadoNoticias.omitidas.length === 0
+  ) {
     console.log('   (sin noticias en el manifiesto)');
   }
 
@@ -386,15 +432,45 @@ async function main(): Promise<void> {
   for (const foto of resultadoGaleria.agregadas) {
     console.log(`   + [${foto.id}] ${foto.url} (${foto.fecha}, ${foto.categoria})`);
   }
+  for (const foto of resultadoGaleria.actualizadas) {
+    console.log(`   ~ [${foto.id}] ${foto.url} (actualizada)`);
+  }
   for (const omitida of resultadoGaleria.omitidas) {
     console.log(`   = ${omitida.titulo}: ${omitida.motivo}`);
   }
-  if (resultadoGaleria.agregadas.length === 0 && resultadoGaleria.omitidas.length === 0) {
+  if (
+    resultadoGaleria.agregadas.length === 0 &&
+    resultadoGaleria.actualizadas.length === 0 &&
+    resultadoGaleria.omitidas.length === 0
+  ) {
     console.log('   (sin fotos en el manifiesto)');
   }
 
+  console.log('\n🛒 Tienda');
+  for (const producto of resultadoProductos.agregadas) {
+    console.log(`   + [${producto.id}] ${producto.nombre} (${producto.categoria})`);
+  }
+  for (const producto of resultadoProductos.actualizadas) {
+    console.log(`   ~ [${producto.id}] ${producto.nombre} (actualizado)`);
+  }
+  for (const omitida of resultadoProductos.omitidas) {
+    console.log(`   = ${omitida.titulo}: ${omitida.motivo}`);
+  }
+  if (
+    resultadoProductos.agregadas.length === 0 &&
+    resultadoProductos.actualizadas.length === 0 &&
+    resultadoProductos.omitidas.length === 0
+  ) {
+    console.log('   (sin productos en el manifiesto)');
+  }
+
   const hayCambios =
-    resultadoNoticias.agregadas.length > 0 || resultadoGaleria.agregadas.length > 0;
+    resultadoNoticias.agregadas.length > 0 ||
+    resultadoNoticias.actualizadas.length > 0 ||
+    resultadoGaleria.agregadas.length > 0 ||
+    resultadoGaleria.actualizadas.length > 0 ||
+    resultadoProductos.agregadas.length > 0 ||
+    resultadoProductos.actualizadas.length > 0;
 
   if (!opciones.publicar) {
     console.log('\nℹ️  Simulacion: no se subio ni se guardo nada.');
@@ -411,10 +487,12 @@ async function main(): Promise<void> {
     ...documento,
     noticias: resultadoNoticias.noticias,
     galeria: resultadoGaleria.galeria,
+    productos: resultadoProductos.productos,
   });
 
   console.log(
-    `\n✅ Publicado: ${resultadoNoticias.agregadas.length} noticias y ${resultadoGaleria.agregadas.length} fotos nuevas.\n`,
+    `\n✅ Publicado: ${resultadoNoticias.agregadas.length} noticias, ${resultadoGaleria.agregadas.length} fotos y ${resultadoProductos.agregadas.length} productos nuevos; ` +
+      `${resultadoNoticias.actualizadas.length} noticias, ${resultadoGaleria.actualizadas.length} fotos y ${resultadoProductos.actualizadas.length} productos actualizados.\n`,
   );
 }
 

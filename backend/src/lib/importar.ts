@@ -30,8 +30,32 @@ export interface FotoImportada {
   categoria: string;
 }
 
+/** Producto de la tienda tal como lo guarda el sitio. */
+export interface ProductoImportado {
+  id: number;
+  nombre: string;
+  precio: number;
+  categoria: string;
+  stock: number;
+  url: string;
+}
+
+/** Un producto del manifiesto. */
+export interface EntradaProducto {
+  /** Si coincide con un producto existente, se actualiza en vez de crearlo. */
+  id?: number;
+  nombre?: string;
+  /** Nombre del archivo dentro de `importar/`, o una URL ya publicada. */
+  imagen?: string;
+  precio?: number;
+  categoria?: string;
+  stock?: number;
+}
+
 /** Una noticia del manifiesto, antes de subir su imagen. */
 export interface EntradaNoticia {
+  /** Si coincide con una noticia existente, se actualiza en vez de crearla. */
+  id?: number;
   titulo?: string;
   /** Nombre del archivo dentro de `importar/`, o una URL ya publicada. */
   imagen?: string;
@@ -44,6 +68,8 @@ export interface EntradaNoticia {
 
 /** Una foto del manifiesto, antes de subirla. */
 export interface EntradaGaleria {
+  /** Si coincide con una foto existente, se actualiza en vez de crearla. */
+  id?: number;
   archivo?: string;
   fecha?: string;
   categoria?: string;
@@ -53,6 +79,7 @@ export interface EntradaGaleria {
 export interface DocumentoContenido {
   noticias: NoticiaImportada[];
   galeria: FotoImportada[];
+  productos?: ProductoImportado[];
   [seccion: string]: unknown;
 }
 
@@ -174,11 +201,18 @@ export function construirNoticia(
 export function fusionarNoticias(
   documento: DocumentoContenido,
   nuevas: Array<EntradaLista<EntradaNoticia>>,
-): { noticias: NoticiaImportada[]; agregadas: NoticiaImportada[]; omitidas: Omitida[] } {
+): {
+  noticias: NoticiaImportada[];
+  agregadas: NoticiaImportada[];
+  actualizadas: NoticiaImportada[];
+  omitidas: Omitida[];
+} {
   const actuales = Array.isArray(documento.noticias) ? documento.noticias : [];
+  const resultado = [...actuales];
   const titulos = new Set(actuales.map((noticia) => normalizarTitulo(noticia?.titulo ?? '')));
 
   const agregadas: NoticiaImportada[] = [];
+  const actualizadas: NoticiaImportada[] = [];
   const omitidas: Omitida[] = [];
   let id = siguienteId(actuales);
 
@@ -191,8 +225,43 @@ export function fusionarNoticias(
       continue;
     }
 
+    // Con `id` se actualiza una noticia que ya existe: sirve para cambiarle la
+    // portada (o el texto) sin crear una copia.
+    const idExistente = Number(entrada.id);
+    const posicion =
+      Number.isFinite(idExistente) && idExistente > 0
+        ? resultado.findIndex((noticia) => Number(noticia?.id) === idExistente)
+        : -1;
+
+    if (posicion >= 0) {
+      const anterior = resultado[posicion];
+      const actualizada = construirNoticia(entrada, idExistente, urlImagen);
+
+      // Lo que el manifiesto no dice se conserva: una entrada que solo cambia
+      // la foto no debe borrar el texto, la categoria ni la destacada.
+      if (!entrada.categoria?.trim() && anterior.categoria) {
+        actualizada.categoria = anterior.categoria;
+      }
+      if (!entrada.extracto?.trim() && anterior.extracto) {
+        actualizada.extracto = anterior.extracto;
+      }
+      if (!actualizada.contenido && anterior.contenido) {
+        actualizada.contenido = anterior.contenido;
+      }
+      if (entrada.destacada === undefined && anterior.destacada) {
+        actualizada.destacada = true;
+      }
+
+      resultado[posicion] = actualizada;
+      actualizadas.push(actualizada);
+      continue;
+    }
+
     if (titulos.has(clave)) {
-      omitidas.push({ titulo, motivo: 'ya existe una noticia con ese titulo' });
+      omitidas.push({
+        titulo,
+        motivo: 'ya existe una noticia con ese titulo (agrega "id" para actualizarla)',
+      });
       continue;
     }
 
@@ -201,18 +270,25 @@ export function fusionarNoticias(
     id += 1;
   }
 
-  return { noticias: [...agregadas, ...actuales], agregadas, omitidas };
+  return { noticias: [...agregadas, ...resultado], agregadas, actualizadas, omitidas };
 }
 
 /** Igual que `fusionarNoticias` pero para la galeria (dedupe por URL). */
 export function fusionarGaleria(
   documento: DocumentoContenido,
   nuevas: Array<EntradaLista<EntradaGaleria>>,
-): { galeria: FotoImportada[]; agregadas: FotoImportada[]; omitidas: Omitida[] } {
+): {
+  galeria: FotoImportada[];
+  agregadas: FotoImportada[];
+  actualizadas: FotoImportada[];
+  omitidas: Omitida[];
+} {
   const actuales = Array.isArray(documento.galeria) ? documento.galeria : [];
+  const resultado = [...actuales];
   const urls = new Set(actuales.map((foto) => foto?.url).filter(Boolean));
 
   const agregadas: FotoImportada[] = [];
+  const actualizadas: FotoImportada[] = [];
   const omitidas: Omitida[] = [];
   let id = siguienteId(actuales);
 
@@ -222,8 +298,30 @@ export function fusionarGaleria(
       continue;
     }
 
+    const idExistente = Number(entrada.id);
+    const posicion =
+      Number.isFinite(idExistente) && idExistente > 0
+        ? resultado.findIndex((foto) => Number(foto?.id) === idExistente)
+        : -1;
+
+    if (posicion >= 0) {
+      const foto: FotoImportada = {
+        id: idExistente,
+        url: urlImagen,
+        fecha: entrada.fecha,
+        categoria: (entrada.categoria ?? '').trim() || resultado[posicion].categoria || 'Partidos',
+      };
+
+      resultado[posicion] = foto;
+      actualizadas.push(foto);
+      continue;
+    }
+
     if (urls.has(urlImagen)) {
-      omitidas.push({ titulo: archivo, motivo: 'la foto ya esta en la galeria' });
+      omitidas.push({
+        titulo: archivo,
+        motivo: 'la foto ya esta en la galeria (agrega "id" para actualizarla)',
+      });
       continue;
     }
 
@@ -237,5 +335,102 @@ export function fusionarGaleria(
     id += 1;
   }
 
-  return { galeria: [...agregadas, ...actuales], agregadas, omitidas };
+  return { galeria: [...agregadas, ...resultado], agregadas, actualizadas, omitidas };
 }
+
+/** Lista de problemas de un producto; vacia si esta bien. */
+export function validarProducto(entrada: EntradaProducto): string[] {
+  const problemas: string[] = [];
+
+  if (!entrada.nombre?.trim()) {
+    problemas.push('falta el nombre');
+  }
+
+  if (!entrada.imagen?.trim()) {
+    problemas.push('falta la imagen (nombre del archivo o URL)');
+  }
+
+  return problemas;
+}
+
+function numero(valor: unknown, porDefecto: number): number {
+  const convertido = Number(valor);
+  return Number.isFinite(convertido) ? convertido : porDefecto;
+}
+
+/**
+ * Mezcla los productos de la tienda. Con `id` se actualiza el producto (sirve
+ * para cambiarle la foto); sin `id` se crea, salvo que el nombre ya exista.
+ */
+export function fusionarProductos(
+  documento: DocumentoContenido,
+  nuevas: Array<EntradaLista<EntradaProducto>>,
+): {
+  productos: ProductoImportado[];
+  agregadas: ProductoImportado[];
+  actualizadas: ProductoImportado[];
+  omitidas: Omitida[];
+} {
+  const actuales = Array.isArray(documento.productos) ? documento.productos : [];
+  const resultado = [...actuales];
+  const nombres = new Set(actuales.map((producto) => normalizarTitulo(producto?.nombre ?? '')));
+
+  const agregadas: ProductoImportado[] = [];
+  const actualizadas: ProductoImportado[] = [];
+  const omitidas: Omitida[] = [];
+  let id = siguienteId(actuales);
+
+  for (const { entrada, urlImagen, archivo } of nuevas) {
+    const nombre = (entrada.nombre ?? '').trim();
+    const clave = normalizarTitulo(nombre);
+
+    if (!clave) {
+      omitidas.push({ titulo: archivo, motivo: 'sin nombre' });
+      continue;
+    }
+
+    const idExistente = Number(entrada.id);
+    const posicion =
+      Number.isFinite(idExistente) && idExistente > 0
+        ? resultado.findIndex((producto) => Number(producto?.id) === idExistente)
+        : -1;
+
+    if (posicion >= 0) {
+      const anterior = resultado[posicion];
+      const producto: ProductoImportado = {
+        id: idExistente,
+        nombre,
+        precio: numero(entrada.precio, anterior.precio),
+        categoria: (entrada.categoria ?? '').trim() || anterior.categoria || 'Tienda',
+        stock: numero(entrada.stock, anterior.stock),
+        url: urlImagen,
+      };
+
+      resultado[posicion] = producto;
+      actualizadas.push(producto);
+      continue;
+    }
+
+    if (nombres.has(clave)) {
+      omitidas.push({
+        titulo: nombre,
+        motivo: 'ya existe un producto con ese nombre (agrega "id" para actualizarlo)',
+      });
+      continue;
+    }
+
+    nombres.add(clave);
+    agregadas.push({
+      id,
+      nombre,
+      precio: numero(entrada.precio, 0),
+      categoria: (entrada.categoria ?? '').trim() || 'Tienda',
+      stock: numero(entrada.stock, 0),
+      url: urlImagen,
+    });
+    id += 1;
+  }
+
+  return { productos: [...agregadas, ...resultado], agregadas, actualizadas, omitidas };
+}
+

@@ -1,11 +1,12 @@
 {
-  "_ayuda": "Copia este archivo como noticias.json y completa los datos. Cada 'imagen'/'archivo' debe ser el nombre de un archivo que este en esta misma carpeta (JPG/PNG/WebP, maximo 5 MB). 'fecha' va en formato AAAA-MM-DD. El contenido admite HTML.",
+  "_ayuda": "Copia este archivo como noticias.json y completa los datos. Cada 'imagen'/'archivo' debe ser el nombre de un archivo que este en esta misma carpeta (JPG/PNG/WebP, maximo 5 MB). 'fecha' va en formato AAAA-MM-DD. El contenido admite HTML. Si pones 'id', se actualiza el elemento que ya existe con ese id en vez de crear uno nuevo.",
 
   "noticias": [
     {
-      "titulo": "EJEMPLO - borra esta entrada antes de importar",
-      "imagen": "ejemplo-noticia.jpg",
-      "fecha": "2026-11-12",
+      "id": 1,
+      "titulo": "Gran victoria en el clasico",
+      "imagen": "noticia-1.jpg",
+      "fecha": "2026-10-23",
       "categoria": "Resultados",
       "extracto": "Frase corta que se ve en la portada, bajo el titulo.",
       "contenido": "<p>Primer parrafo de la noticia.</p><p>Segundo parrafo.</p>",
@@ -15,9 +16,18 @@
 
   "galeria": [
     {
-      "archivo": "ejemplo-galeria.jpg",
-      "fecha": "2026-11-12",
+      "id": 1,
+      "archivo": "galeria-1.jpg",
+      "fecha": "2026-10-20",
       "categoria": "Partidos"
+    }
+  ],
+
+  "productos": [
+    {
+      "id": 3,
+      "nombre": "Pantalon Oficial",
+      "imagen": "producto-3.jpg"
     }
   ]
 }

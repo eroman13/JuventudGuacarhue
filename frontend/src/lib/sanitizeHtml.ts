@@ -6,7 +6,13 @@
  * por el servidor y se muestra a todos los visitantes, asi que antes de
  * pintarlo se limpia: solo se permiten etiquetas y atributos seguros y se
  * elimina cualquier script, estilo o manejador de eventos.
+ *
+ * Ademas se "curan" los pegados antiguos de Facebook: los emojis que quedaron
+ * guardados como imagenes vuelven a ser caracteres y las fotos de Facebook
+ * (cuyos enlaces caducan) se quitan, para no dejar iconos rotos.
  */
+
+import { convertirEmojisDeFacebook, quitarFotosDeFacebook } from './pegarHtml'
 
 /** Etiquetas que se mantienen tal cual (sin atributos salvo los permitidos). */
 const ETIQUETAS_PERMITIDAS = new Set([
@@ -155,6 +161,9 @@ export function sanitizeHtml(html: string): string {
 
   const doc = new DOMParser().parseFromString(valor, 'text/html')
   sanearNodo(doc.body)
+  // Pegados antiguos: emojis-imagen y fotos de Facebook que ya no cargan.
+  convertirEmojisDeFacebook(doc.body)
+  quitarFotosDeFacebook(doc.body)
 
   return doc.body.innerHTML
 }

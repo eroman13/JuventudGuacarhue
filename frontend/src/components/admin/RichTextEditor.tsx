@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type ReactNode } from 'react'
 import { RichTextContent } from '../RichTextContent'
+import { curarHtmlGuardado, limpiarHtmlPegado } from '../../lib/pegarHtml'
 import { ImagePreview, readImageFile, uploadImageFile, type Notify } from './ui'
 
 interface RichTextEditorProps {
@@ -86,22 +87,66 @@ export default function RichTextEditor({
   const editorRef = useRef<HTMLDivElement | null>(null)
   const inputImagenRef = useRef<HTMLInputElement | null>(null)
   const rangoGuardado = useRef<Range | null>(null)
+  // Ultimo HTML que salio del editor; sirve para distinguir lo que el usuario
+  // escribe de lo que llega desde fuera (al abrir una noticia guardada).
+  const ultimoEmitido = useRef<string | null>(null)
   const [modo, setModo] = useState<Modo>('editar')
   const [subiendoImagen, setSubiendoImagen] = useState(false)
 
   // Mantiene el HTML del editor sincronizado cuando `value` cambia desde fuera
-  // (por ejemplo, al abrir una noticia existente para editarla).
+  // (por ejemplo, al abrir una noticia existente para editarla). Si esa noticia
+  // trae emojis-imagen o fotos de Facebook de un pegado antiguo, se curan aqui.
   useEffect(() => {
     const editor = editorRef.current
     if (!editor) {
       return
     }
-    if (editor.innerHTML !== (value ?? '')) {
-      editor.innerHTML = value ?? ''
+    const esperado =
+      value === ultimoEmitido.current ? value ?? '' : curarHtmlGuardado(value ?? '')
+    if (editor.innerHTML !== esperado) {
+      editor.innerHTML = esperado
     }
   }, [value, modo])
 
-  const emitirCambio = () => onChange(editorRef.current?.innerHTML ?? '')
+  const emitirCambio = () => {
+    const html = editorRef.current?.innerHTML ?? ''
+    ultimoEmitido.current = html
+    onChange(html)
+  }
+
+  /**
+   * Lo copiado desde Facebook llega como HTML con estilos, cajas y los emojis
+   * como imagenes remotas: al pegarlo tal cual, cada emoji heredaba el estilo
+   * de imagen de la noticia (ancho completo) y el cuerpo se desarmaba. Aqui se
+   * convierte en parrafos limpios antes de insertarlo.
+   */
+  const handlePegar = (event: ClipboardEvent<HTMLDivElement>) => {
+    if (disabled) {
+      return
+    }
+
+    const datos = event.clipboardData
+    const html = datos?.getData('text/html') ?? ''
+    const texto = datos?.getData('text/plain') ?? ''
+    if (!html && !texto) {
+      return
+    }
+
+    event.preventDefault()
+
+    const { html: limpio, fotosDescartadas } = limpiarHtmlPegado(html, texto)
+    if (limpio) {
+      document.execCommand('insertHTML', false, limpio)
+      emitirCambio()
+    }
+
+    if (fotosDescartadas > 0) {
+      notify?.(
+        `Se quitaron ${fotosDescartadas} imagen(es) copiadas de Facebook: sus enlaces caducan. Subelas con el boton de imagen.`,
+        'error',
+      )
+    }
+  }
 
   const recordarSeleccion = () => {
     const editor = editorRef.current
@@ -297,6 +342,7 @@ export default function RichTextEditor({
             aria-label="Cuerpo de la noticia"
             data-placeholder={placeholder}
             onInput={emitirCambio}
+            onPaste={handlePegar}
             onKeyUp={recordarSeleccion}
             onMouseUp={recordarSeleccion}
             onBlur={recordarSeleccion}

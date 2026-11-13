@@ -82,6 +82,23 @@ Revisa el `noticias.json` generado antes de publicar: los títulos y las
 categorías son lo único que conviene corregir a mano. Si el token expira, el
 script lo dice (código 190) y basta con generar otro.
 
+## 1c. Pegar textos de Facebook a mano en el panel
+
+Al copiar una publicación de Facebook y pegarla en **Cuerpo de la noticia**, el
+navegador no lleva texto: lleva HTML con estilos, una caja por línea y —lo que
+más molesta— cada emoji como imagen remota de 16 px. Como el cuerpo aplica
+estilo de imagen a todo (`ancho completo`), cada emoji terminaba ocupando una
+línea entera con sombra y el texto quedaba desarmado. En el *extracto* no pasaba
+porque es un campo de texto simple.
+
+Desde ahora el editor limpia el pegado: los emojis vuelven a ser caracteres, los
+títulos, listas y enlaces se conservan y los estilos se descartan. Las **fotos**
+copiadas de Facebook se quitan con un aviso, porque sus enlaces caducan (dan
+403): hay que subirlas con el botón 🖼 (o por `importar/`).
+
+Las noticias que ya estaban guardadas con esos emojis-imagen se ven bien igual:
+se curan al mostrarlas y al abrirlas de nuevo en el panel.
+
 ## 2. Escribir `noticias.json`
 
 Copia `noticias.ejemplo.json` a `noticias.json` y edítalo. Cada noticia:

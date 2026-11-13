@@ -8,7 +8,8 @@ export interface NoticiaItem {
   destacada?: boolean
   /**
    * Cuerpo completo de la noticia en HTML (editor enriquecido).
-   * Opcional: si esta vacio se muestra solo el extracto.
+   * Opcional: si esta vacio, la pagina de la noticia se muestra solo con su
+   * titulo, fecha e imagen (el extracto es unicamente el resumen de portada).
    */
   contenido?: string
 }

@@ -331,7 +331,11 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
                 className="h-36 w-full rounded-lg object-cover"
               />
 
-              <Field label="Extracto" error={errors.extracto}>
+              <Field
+                label="Extracto"
+                error={errors.extracto}
+                hint="Resumen corto: se muestra solo en la portada y en las tarjetas, no dentro de la noticia."
+              >
                 <textarea
                   value={form.extracto}
                   onChange={(event) => setField('extracto', event.target.value)}
@@ -353,6 +357,10 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
                   previewFecha={formatFecha(form.fecha)}
                   previewImagen={form.imagen}
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  Es el texto que se ve al abrir la noticia. Si lo dejas vacío, la noticia se muestra
+                  solo con su titulo, fecha e imagen.
+                </p>
               </div>
 
               <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">

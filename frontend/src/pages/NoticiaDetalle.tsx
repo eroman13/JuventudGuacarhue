@@ -46,7 +46,6 @@ export default function NoticiaDetalle() {
         <h1 className="mt-3 text-3xl font-bold leading-tight text-neutral-950 sm:text-4xl">
           {noticia.titulo}
         </h1>
-        {noticia.extracto && <p className="mt-3 text-lg text-neutral-600">{noticia.extracto}</p>}
 
         <ImagePreview
           url={noticia.imagen}
@@ -54,13 +53,12 @@ export default function NoticiaDetalle() {
           className="mt-6 h-80 w-full rounded-lg object-cover shadow-md"
         />
 
-        <div className="mt-6">
-          {tieneContenido ? (
+        {/* El extracto es solo el resumen de la portada: aquí se muestra el cuerpo. */}
+        {tieneContenido && (
+          <div className="mt-6">
             <RichTextContent html={noticia.contenido ?? ''} />
-          ) : (
-            <p className="text-neutral-700">{noticia.extracto}</p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </article>
   )

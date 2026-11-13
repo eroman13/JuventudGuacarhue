@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ROLES_QUE_EDITAN, useAuth } from '../hooks/useAuth'
 import { useClubData } from '../hooks/useClubData'
-import { getSyncSnapshot } from '../data/clubStore'
+import { almacenamientoDisponible, getSyncSnapshot } from '../data/clubStore'
 import { API_BASE_URL } from '../lib/api'
 import { ADMIN_TABS, type AdminTab } from '../components/admin/tabs'
 import { Badge, type Notify } from '../components/admin/ui'
@@ -207,6 +207,17 @@ export default function Admin() {
         </div>
       )}
 
+      {!almacenamientoDisponible() && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <div className="mx-auto max-w-[1400px] px-4 py-2 sm:px-6">
+            <p className="text-xs font-semibold text-amber-800">
+              Este navegador bloquea el almacenamiento del sitio: si un guardado falla, los cambios se
+              pierden al recargar. Permite cookies y datos del sitio para este panel.
+            </p>
+          </div>
+        </div>
+      )}
+
       {avisoPendiente && (
         <div className="border-b border-rose-200 bg-rose-50">
           <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -215,6 +226,11 @@ export default function Admin() {
                 Los cambios NO están en el servidor
               </p>
               <p className="mt-0.5 text-xs text-rose-700">{sincronizacion.mensaje}</p>
+              {sincronizacion.detalle && (
+                <p className="mt-1 break-all font-mono text-[10px] text-rose-600/90">
+                  {sincronizacion.detalle}
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <button

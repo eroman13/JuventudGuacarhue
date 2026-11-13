@@ -609,6 +609,11 @@ export interface EstadoSync {
   mensaje: string
   /** Última vez que el servidor confirmó un guardado (ISO 8601). */
   actualizadoEn: string | null
+  /**
+   * Detalle técnico del último intento (`PUT https://.../contenido → 401`).
+   * Se muestra en el panel para que el problema no quede en "algo falló".
+   */
+  detalle: string | null
 }
 
 const TOKEN_KEY = 'token'
@@ -662,10 +667,41 @@ function marcarCambiosSinGuardar(valor: boolean): void {
   }
 }
 
+let almacenamientoOk: boolean | null = null
+
+/**
+ * ¿El navegador deja guardar datos localmente?
+ *
+ * Si está bloqueado (modo privado, datos del sitio bloqueados, cuota llena) los
+ * cambios en curso se pierden al recargar, así que el panel tiene que avisarlo
+ * en vez de dar por hecho que quedaron "solo en este navegador".
+ */
+export function almacenamientoDisponible(): boolean {
+  if (almacenamientoOk !== null) {
+    return almacenamientoOk
+  }
+
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    const prueba = `${STORAGE_KEY}-prueba`
+    window.localStorage.setItem(prueba, '1')
+    window.localStorage.removeItem(prueba)
+    almacenamientoOk = true
+  } catch {
+    almacenamientoOk = false
+  }
+
+  return almacenamientoOk
+}
+
 let estadoSync: EstadoSync = {
   estado: 'inicial',
   mensaje: 'Cargando el contenido del servidor...',
   actualizadoEn: null,
+  detalle: null,
 }
 
 const syncListeners = new Set<Listener>()
@@ -682,7 +718,14 @@ export function subscribeSync(listener: Listener): () => void {
 }
 
 function setEstadoSync(parcial: Partial<EstadoSync>): void {
-  estadoSync = { ...estadoSync, ...parcial }
+  const siguiente: EstadoSync = { ...estadoSync, ...parcial }
+
+  // El detalle describe un intento concreto: no debe sobrevivir al siguiente.
+  if (parcial.detalle === undefined) {
+    siguiente.detalle = null
+  }
+
+  estadoSync = siguiente
   syncListeners.forEach((listener) => listener())
 }
 
@@ -776,8 +819,41 @@ export async function cargarContenidoRemoto(forzar = false): Promise<void> {
 }
 
 let temporizadorGuardado: ReturnType<typeof setTimeout> | null = null
+let temporizadorReintento: ReturnType<typeof setTimeout> | null = null
 let guardadoEnCurso = false
 let guardadoPendiente = false
+
+/** Esperas (ms) entre reintentos automáticos antes de molestar al administrador. */
+const REINTENTOS_MS = [2_000, 5_000, 15_000, 30_000]
+let reintentosHechos = 0
+
+function cancelarReintento(): void {
+  if (temporizadorReintento) {
+    clearTimeout(temporizadorReintento)
+    temporizadorReintento = null
+  }
+}
+
+/**
+ * Reintenta el guardado por su cuenta (corte de red o error 5xx del servidor),
+ * para que un fallo pasajero no obligue a volver a cargar la noticia a mano.
+ * Devuelve false cuando ya no quedan reintentos y hay que avisar en el panel.
+ */
+function programarReintento(): boolean {
+  if (typeof window === 'undefined' || reintentosHechos >= REINTENTOS_MS.length) {
+    return false
+  }
+
+  const espera = REINTENTOS_MS[reintentosHechos]
+  reintentosHechos += 1
+  cancelarReintento()
+  temporizadorReintento = setTimeout(() => {
+    temporizadorReintento = null
+    void guardarEnServidor({ desdeReintento: true })
+  }, espera)
+
+  return true
+}
 
 function programarGuardado(): void {
   if (typeof window === 'undefined') {
@@ -794,13 +870,42 @@ function programarGuardado(): void {
   }, RETARDO_GUARDADO_MS)
 }
 
+/** Mensaje que devuelve el backend cuando rechaza el contenido. */
+async function leerMensajeDeError(respuesta: Response): Promise<string> {
+  try {
+    const payload = (await respuesta.json()) as {
+      error?: { message?: string }
+      message?: string
+    }
+    return (payload.error?.message ?? payload.message ?? '').trim()
+  } catch {
+    return ''
+  }
+}
+
+export interface OpcionesGuardado {
+  /** `true` cuando la llamada viene del reintento automático. */
+  desdeReintento?: boolean
+}
+
 /**
  * Envía el documento completo al backend. Requiere una sesión real
  * (el modo demostración solo guarda en este navegador).
+ *
+ * Los cortes de red y los errores 5xx se reintentan solos; cualquier 4xx avisa
+ * con el motivo exacto que devolvió el servidor, sin dar nada por guardado.
  */
-export async function guardarEnServidor(): Promise<boolean> {
+export async function guardarEnServidor(opciones: OpcionesGuardado = {}): Promise<boolean> {
   if (typeof window === 'undefined') {
     return false
+  }
+
+  const endpoint = apiUrl('/contenido')
+
+  if (!opciones.desdeReintento) {
+    // Un intento nuevo (o del administrador) vuelve a tener reintentos disponibles.
+    reintentosHechos = 0
+    cancelarReintento()
   }
 
   const token = leerToken()
@@ -808,7 +913,8 @@ export async function guardarEnServidor(): Promise<boolean> {
     setEstadoSync({
       estado: 'sin-sesion',
       mensaje:
-        'Inicia sesión con tu cuenta del club para publicar los cambios. Quedan guardados en este navegador hasta que lo hagas.',
+        'No hay una sesión real abierta: inicia sesión con tu cuenta del club para publicar los cambios.',
+      detalle: `No se envió nada a ${endpoint}: falta el token de sesión.`,
     })
     return false
   }
@@ -825,10 +931,17 @@ export async function guardarEnServidor(): Promise<boolean> {
   }
 
   guardadoEnCurso = true
-  setEstadoSync({ estado: 'guardando', mensaje: 'Guardando en el servidor...' })
+  setEstadoSync({
+    estado: 'guardando',
+    mensaje:
+      reintentosHechos > 0
+        ? `Reintentando guardado (${reintentosHechos} de ${REINTENTOS_MS.length})...`
+        : 'Guardando en el servidor...',
+    detalle: `PUT ${endpoint}`,
+  })
 
   try {
-    const respuesta = await fetch(apiUrl('/contenido'), {
+    const respuesta = await fetch(endpoint, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -841,31 +954,76 @@ export async function guardarEnServidor(): Promise<boolean> {
       setEstadoSync({
         estado: 'sin-sesion',
         mensaje:
-          'Tu sesión ya no permite guardar. Vuelve a iniciar sesión y usa "Reintentar guardado": los cambios siguen guardados en este navegador.',
+          'El servidor no acepta esta sesión. Inicia sesión de nuevo: al entrar, los cambios pendientes se publican solos.',
+        detalle: `PUT ${endpoint} → ${respuesta.status}. El token guardado en este navegador ya no sirve.`,
       })
       return false
     }
 
     if (!respuesta.ok) {
-      throw new Error(`HTTP ${respuesta.status}`)
+      const motivo = await leerMensajeDeError(respuesta)
+      const detalle = `PUT ${endpoint} → ${respuesta.status}${motivo ? `: ${motivo}` : ''}`
+
+      // Un 4xx es un problema del contenido o de los permisos: reintentar no sirve.
+      if (respuesta.status < 500) {
+        setEstadoSync({
+          estado: 'error',
+          mensaje: `El servidor rechazó el guardado${motivo ? `: ${motivo}` : ''}. Los cambios siguen en este navegador.`,
+          detalle,
+        })
+        return false
+      }
+
+      if (programarReintento()) {
+        setEstadoSync({
+          estado: 'guardando',
+          mensaje: `El servidor falló (${respuesta.status}). Reintentando solo: intento ${reintentosHechos} de ${REINTENTOS_MS.length}.`,
+          detalle,
+        })
+        return false
+      }
+
+      setEstadoSync({
+        estado: 'error',
+        mensaje:
+          'El servidor no pudo guardar tras varios intentos. Los cambios siguen en este navegador: usa "Reintentar guardado".',
+        detalle,
+      })
+      return false
     }
 
     const payload = (await respuesta.json()) as { actualizadoEn?: string | null }
 
     // El servidor confirmó: ya no hay nada pendiente en este navegador.
+    reintentosHechos = 0
+    cancelarReintento()
     marcarCambiosSinGuardar(false)
 
     setEstadoSync({
       estado: 'sincronizado',
       mensaje: 'Guardado en el servidor: todos los visitantes ven estos cambios.',
       actualizadoEn: payload.actualizadoEn ?? new Date().toISOString(),
+      detalle: `PUT ${endpoint} → ${respuesta.status}`,
     })
     return true
-  } catch {
+  } catch (error) {
+    const motivo = error instanceof Error ? error.message : 'sin conexión'
+    const detalle = `PUT ${endpoint} → error de red (${motivo})`
+
+    if (programarReintento()) {
+      setEstadoSync({
+        estado: 'guardando',
+        mensaje: `Sin conexión con el servidor. Reintentando solo: intento ${reintentosHechos} de ${REINTENTOS_MS.length}.`,
+        detalle,
+      })
+      return false
+    }
+
     setEstadoSync({
       estado: 'error',
       mensaje:
-        'No se pudo guardar en el servidor. Los cambios quedan guardados en este navegador: revisa la conexión y usa "Reintentar guardado".',
+        'No se pudo guardar en el servidor. Los cambios siguen en este navegador: revisa la conexión y usa "Reintentar guardado".',
+      detalle,
     })
     return false
   } finally {

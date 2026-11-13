@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, createContext, useCallback } from 'react'
 import { apiUrl, API_BASE_URL } from '../lib/api'
+import { guardarEnServidor, hayCambiosSinGuardar } from '../data/clubStore'
 
 export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MODERADOR' | 'EDITOR' | 'VIEWER'
 
@@ -150,6 +151,16 @@ function clearSession(): void {
   }
 }
 
+/**
+ * Publica lo que quedó sin guardar en este navegador en cuanto hay una sesión
+ * real. Así, tras volver a entrar, el trabajo pendiente no hay que rehacerlo.
+ */
+function publicarPendientes(): void {
+  if (hayCambiosSinGuardar()) {
+    void guardarEnServidor()
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -175,9 +186,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return
         }
 
-        // Si quedó guardada una sesión de demostración, probamos si el backend
-        // ya volvió y la cambiamos por una real sin obligar a cerrar sesión.
+        // Si quedó guardada una sesión de demostración, en desarrollo probamos si
+        // el backend ya volvió y la cambiamos por una real. En producción el modo
+        // demostración no existe: esa sesión no puede publicar nada, así que se
+        // descarta para que el panel pida un login verdadero.
         if (savedToken === 'demo-token-local') {
+          if (import.meta.env.PROD) {
+            clearSession()
+            return
+          }
+
           try {
             const datos = await pedirLogin(DEMO_ADMIN.email, DEMO_ADMIN.password)
             if (!activo) return
@@ -208,6 +226,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(parsed)
         setIsLoggedIn(true)
         setIsDemoMode(savedToken === 'demo-token-local')
+
+        // Si quedaron cambios sin publicar, se envían apenas la sesión es válida.
+        if (savedToken !== 'demo-token-local') {
+          publicarPendientes()
+        }
       } catch {
         clearSession()
       } finally {
@@ -232,6 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoggedIn(true)
       setIsDemoMode(false)
       persistSession(datos.token, datos.user)
+      publicarPendientes()
       return
     } catch (error) {
       const isNetworkError =
@@ -239,6 +263,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!isNetworkError) {
         throw error
+      }
+
+      // En producción no existe el modo demostración: un corte de red no puede
+      // dejar una sesión falsa que después nunca podrá publicar los cambios.
+      if (import.meta.env.PROD) {
+        throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.')
       }
 
       // Fallback de desarrollo cuando backend/base de datos no estan disponibles.
@@ -267,6 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoggedIn(true)
       setIsDemoMode(false)
       persistSession(datos.token, datos.user)
+      publicarPendientes()
       return true
     } catch {
       return false
@@ -303,6 +334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoggedIn(true)
       setIsDemoMode(false)
       persistSession(payload.token, payload.user)
+      publicarPendientes()
     },
     [],
   )

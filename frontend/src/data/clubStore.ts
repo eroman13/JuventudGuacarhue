@@ -159,6 +159,8 @@ function guardarEnNavegador(next: ClubData): void {
 function commit(next: ClubData): void {
   snapshot = next
   guardarEnNavegador(next)
+  // El cambio ya vive en este navegador, pero aún no en el servidor.
+  marcarCambiosSinGuardar(true)
   emit()
   programarGuardado()
 }
@@ -592,7 +594,14 @@ export function resetClubData(): void {
 /* Sincronizacion con el servidor                                      */
 /* ------------------------------------------------------------------ */
 
-export type EstadoSincronizacion = 'inicial' | 'guardando' | 'sincronizado' | 'sin-sesion' | 'error'
+export type EstadoSincronizacion =
+  | 'inicial'
+  | 'guardando'
+  | 'sincronizado'
+  | 'sin-sesion'
+  | 'error'
+  /** Hay cambios hechos en este navegador que el servidor todavía no confirmó. */
+  | 'pendiente'
 
 export interface EstadoSync {
   estado: EstadoSincronizacion
@@ -604,10 +613,54 @@ export interface EstadoSync {
 
 const TOKEN_KEY = 'token'
 const DEMO_TOKEN = 'demo-token-local'
+/**
+ * Marca (en localStorage) de que existen cambios hechos en este navegador que el
+ * servidor todavía no confirmó. Sirve para dos cosas:
+ *   1. no perder el trabajo si el guardado falla (sesión vencida, sin conexión),
+ *   2. no pisar esos cambios con el contenido publicado al recargar la página.
+ */
+const PENDIENTE_KEY = 'juventud_club_data_pendiente'
 /** Tiempo mínimo entre descargas para no pedir el contenido en cada navegación. */
 const INTERVALO_ENTRE_CARGAS_MS = 20_000
 /** Espera tras el último cambio antes de enviarlo al servidor. */
 const RETARDO_GUARDADO_MS = 800
+
+function leerBanderaPendiente(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    return window.localStorage.getItem(PENDIENTE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** ¿Hay cambios locales que el servidor todavía no confirmó? */
+let cambiosSinGuardar = leerBanderaPendiente()
+
+export function hayCambiosSinGuardar(): boolean {
+  return cambiosSinGuardar
+}
+
+function marcarCambiosSinGuardar(valor: boolean): void {
+  cambiosSinGuardar = valor
+
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    if (valor) {
+      window.localStorage.setItem(PENDIENTE_KEY, '1')
+    } else {
+      window.localStorage.removeItem(PENDIENTE_KEY)
+    }
+  } catch {
+    // Sin almacenamiento la marca vive solo en memoria.
+  }
+}
 
 let estadoSync: EstadoSync = {
   estado: 'inicial',
@@ -655,6 +708,10 @@ let ultimaCarga = 0
 /**
  * Descarga el contenido publicado en el servidor y reemplaza el estado local.
  * Cada dispositivo ve exactamente el mismo contenido.
+ *
+ * Salvo que se fuerce (`forzar = true`), no reemplaza nada mientras haya cambios
+ * locales sin confirmar: así una recarga no borra el trabajo del administrador
+ * cuando el guardado falló (sesión vencida, sin conexión).
  */
 export async function cargarContenidoRemoto(forzar = false): Promise<void> {
   if (typeof window === 'undefined') {
@@ -665,6 +722,16 @@ export async function cargarContenidoRemoto(forzar = false): Promise<void> {
   if (!forzar && ultimaCarga !== 0 && ahora - ultimaCarga < INTERVALO_ENTRE_CARGAS_MS) {
     return
   }
+
+  if (!forzar && (cambiosSinGuardar || guardadoEnCurso)) {
+    setEstadoSync({
+      estado: 'pendiente',
+      mensaje:
+        'Hay cambios en este navegador que el servidor todavía no recibió. Usa "Reintentar guardado" para publicarlos o "Descartar cambios locales" para volver al contenido publicado.',
+    })
+    return
+  }
+
   ultimaCarga = ahora
 
   try {
@@ -688,6 +755,7 @@ export async function cargarContenidoRemoto(forzar = false): Promise<void> {
       const siguiente = clone(normalizado)
       snapshot = siguiente
       guardarEnNavegador(siguiente)
+      marcarCambiosSinGuardar(false)
       emit()
     }
 
@@ -740,7 +808,7 @@ export async function guardarEnServidor(): Promise<boolean> {
     setEstadoSync({
       estado: 'sin-sesion',
       mensaje:
-        'Inicia sesión con tu cuenta del club para guardar en el servidor. Por ahora los cambios quedan en este navegador.',
+        'Inicia sesión con tu cuenta del club para publicar los cambios. Quedan guardados en este navegador hasta que lo hagas.',
     })
     return false
   }
@@ -748,6 +816,12 @@ export async function guardarEnServidor(): Promise<boolean> {
   if (guardadoEnCurso) {
     guardadoPendiente = true
     return false
+  }
+
+  // Un guardado explícito cancela el envío automático que estaba programado.
+  if (temporizadorGuardado) {
+    clearTimeout(temporizadorGuardado)
+    temporizadorGuardado = null
   }
 
   guardadoEnCurso = true
@@ -766,7 +840,8 @@ export async function guardarEnServidor(): Promise<boolean> {
     if (respuesta.status === 401 || respuesta.status === 403) {
       setEstadoSync({
         estado: 'sin-sesion',
-        mensaje: 'Tu sesión ya no permite guardar. Vuelve a iniciar sesión y repite el cambio.',
+        mensaje:
+          'Tu sesión ya no permite guardar. Vuelve a iniciar sesión y usa "Reintentar guardado": los cambios siguen guardados en este navegador.',
       })
       return false
     }
@@ -776,6 +851,9 @@ export async function guardarEnServidor(): Promise<boolean> {
     }
 
     const payload = (await respuesta.json()) as { actualizadoEn?: string | null }
+
+    // El servidor confirmó: ya no hay nada pendiente en este navegador.
+    marcarCambiosSinGuardar(false)
 
     setEstadoSync({
       estado: 'sincronizado',
@@ -787,7 +865,7 @@ export async function guardarEnServidor(): Promise<boolean> {
     setEstadoSync({
       estado: 'error',
       mensaje:
-        'No se pudo guardar en el servidor. Revisa la conexión: los cambios quedan solo en este navegador.',
+        'No se pudo guardar en el servidor. Los cambios quedan guardados en este navegador: revisa la conexión y usa "Reintentar guardado".',
     })
     return false
   } finally {

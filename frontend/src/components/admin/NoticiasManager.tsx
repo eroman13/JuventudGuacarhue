@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useClubData } from '../../hooks/useClubData'
+import { getSyncSnapshot } from '../../data/clubStore'
 import type { NoticiaItem } from '../../data/seedData'
 import {
   Badge,
@@ -60,7 +61,7 @@ function createEmptyForm(): NoticiaForm {
 }
 
 export default function NoticiasManager({ canManage, notify }: ManagerProps) {
-  const { noticias, addNoticia, updateNoticia, deleteNoticia } = useClubData()
+  const { noticias, addNoticia, updateNoticia, deleteNoticia, guardarEnServidor } = useClubData()
   const [form, setForm] = useState<NoticiaForm>(createEmptyForm)
   const [errors, setErrors] = useState<FormErrors>({})
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -133,7 +134,7 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
     setErrors({})
   }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!canManage) {
       notify('Tu rol es de solo lectura.', 'error')
@@ -154,18 +155,35 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
       destacada: form.destacada,
     }
 
+    const accion = editingId !== null ? 'Noticia actualizada' : 'Noticia publicada'
+
     if (editingId !== null) {
       if (!updateNoticia(editingId, payload)) {
         notify('No pudimos actualizar la noticia seleccionada.', 'error')
         return
       }
-      notify('Noticia actualizada correctamente.')
     } else {
       addNoticia(payload)
-      notify('Noticia publicada correctamente.')
     }
 
     resetForm()
+
+    // Confirmamos con el servidor antes de dar la noticia por publicada.
+    const guardado = await guardarEnServidor()
+
+    if (guardado) {
+      notify(`${accion} y guardada en el servidor.`)
+      return
+    }
+
+    const sincronizacion = getSyncSnapshot()
+
+    if (sincronizacion.estado === 'guardando') {
+      notify(`${accion}. Guardando en el servidor...`)
+      return
+    }
+
+    notify(`${accion} solo en este navegador. ${sincronizacion.mensaje}`, 'error')
   }
 
   const startEdit = (noticia: NoticiaItem) => {
@@ -183,7 +201,7 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDelete) {
       return
     }
@@ -192,8 +210,23 @@ export default function NoticiasManager({ canManage, notify }: ManagerProps) {
     if (editingId === pendingDelete.id) {
       resetForm()
     }
-    notify('Noticia eliminada.')
     setPendingDelete(null)
+
+    const guardado = await guardarEnServidor()
+
+    if (guardado) {
+      notify('Noticia eliminada y guardada en el servidor.')
+      return
+    }
+
+    const sincronizacion = getSyncSnapshot()
+
+    if (sincronizacion.estado === 'guardando') {
+      notify('Noticia eliminada. Guardando en el servidor...')
+      return
+    }
+
+    notify(`Noticia eliminada solo en este navegador. ${sincronizacion.mensaje}`, 'error')
   }
 
   return (

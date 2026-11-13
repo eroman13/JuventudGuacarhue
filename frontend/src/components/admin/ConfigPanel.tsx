@@ -74,7 +74,9 @@ export default function ConfigPanel({ notify }: ConfigPanelProps) {
   const syncTone =
     sincronizacion.estado === 'sincronizado'
       ? 'green'
-      : sincronizacion.estado === 'error' || sincronizacion.estado === 'sin-sesion'
+      : sincronizacion.estado === 'error' ||
+          sincronizacion.estado === 'sin-sesion' ||
+          sincronizacion.estado === 'pendiente'
         ? 'amber'
         : 'blue'
 
@@ -87,7 +89,9 @@ export default function ConfigPanel({ notify }: ConfigPanelProps) {
           ? 'Solo este navegador'
           : sincronizacion.estado === 'error'
             ? 'Sin conexión'
-            : 'Cargando'
+            : sincronizacion.estado === 'pendiente'
+              ? 'Sin guardar'
+              : 'Cargando'
 
   const getStatusColor = () => {
     if (noticiasDestacadas === 0) return 'amber'

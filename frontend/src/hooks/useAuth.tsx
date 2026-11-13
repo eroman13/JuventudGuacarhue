@@ -109,6 +109,27 @@ async function pedirLogin(
   return { token: payload.token, user: payload.user }
 }
 
+/**
+ * Comprueba contra el backend que el token guardado siga siendo válido.
+ *
+ * Devuelve `false` solo cuando el servidor lo rechaza (401/403); si no hay
+ * conexión devuelve `true` para no cerrar la sesión por un corte de red.
+ */
+async function sesionSigueViva(token: string): Promise<boolean> {
+  let response: Response
+
+  try {
+    response = await fetch(apiUrl('/auth/me'), {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      cache: 'no-store',
+    })
+  } catch {
+    return true
+  }
+
+  return !(response.status === 401 || response.status === 403)
+}
+
 function persistSession(nextToken: string, nextUser: User): void {
   try {
     localStorage.setItem('token', nextToken)
@@ -172,6 +193,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (!activo) return
+
+        // Un token vencido dejaría el panel en un estado falso de sesión: los
+        // cambios se guardarían solo en este navegador sin que se notara.
+        const sigueViva = await sesionSigueViva(savedToken)
+        if (!activo) return
+
+        if (!sigueViva) {
+          clearSession()
+          return
+        }
+
         setToken(savedToken)
         setUser(parsed)
         setIsLoggedIn(true)

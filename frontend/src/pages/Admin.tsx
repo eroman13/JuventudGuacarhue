@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ROLES_QUE_EDITAN, useAuth } from '../hooks/useAuth'
 import { useClubData } from '../hooks/useClubData'
+import { getSyncSnapshot } from '../data/clubStore'
 import { API_BASE_URL } from '../lib/api'
 import { ADMIN_TABS, type AdminTab } from '../components/admin/tabs'
 import { Badge, type Notify } from '../components/admin/ui'
@@ -42,13 +43,16 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
   const [toast, setToast] = useState<ToastState | null>(null)
   const [reconectando, setReconectando] = useState(false)
+  const [reintentando, setReintentando] = useState(false)
   const timerRef = useRef<number | null>(null)
-  const { sincronizacion, recargarContenido } = useClubData()
+  const { sincronizacion, recargarContenido, guardarEnServidor } = useClubData()
 
   const syncTone =
     sincronizacion.estado === 'sincronizado'
       ? 'green'
-      : sincronizacion.estado === 'error' || sincronizacion.estado === 'sin-sesion'
+      : sincronizacion.estado === 'error' ||
+          sincronizacion.estado === 'sin-sesion' ||
+          sincronizacion.estado === 'pendiente'
         ? 'amber'
         : 'blue'
 
@@ -61,7 +65,15 @@ export default function Admin() {
           ? 'Solo este navegador'
           : sincronizacion.estado === 'error'
             ? 'Sin conexión al servidor'
-            : 'Cargando contenido'
+            : sincronizacion.estado === 'pendiente'
+              ? 'Cambios sin guardar'
+              : 'Cargando contenido'
+
+  /** Aviso persistente: los cambios de este navegador aún no llegaron al servidor. */
+  const avisoPendiente =
+    sincronizacion.estado === 'error' ||
+    sincronizacion.estado === 'sin-sesion' ||
+    sincronizacion.estado === 'pendiente'
 
   const notify = useCallback<Notify>((message, tone = 'success') => {
     setToast({ message, tone })
@@ -93,6 +105,25 @@ export default function Admin() {
     if (!conectado) {
       notify('Seguimos sin conexión con el servidor. Revisa que el backend esté corriendo.', 'error')
     }
+  }
+
+  /** Reenvía al servidor el contenido que quedó guardado en este navegador. */
+  const handleReintentarGuardado = async () => {
+    setReintentando(true)
+    const guardado = await guardarEnServidor()
+    setReintentando(false)
+
+    if (guardado) {
+      notify('Guardado en el servidor: ya lo ven todos los visitantes.')
+    } else {
+      notify(getSyncSnapshot().mensaje, 'error')
+    }
+  }
+
+  /** Descarta el estado local y vuelve al contenido publicado en el servidor. */
+  const handleDescartarCambiosLocales = async () => {
+    await recargarContenido(true)
+    notify('Se recargó el contenido publicado en el servidor.', 'success')
   }
 
   if (!isReady) {
@@ -172,6 +203,36 @@ export default function Admin() {
             >
               {reconectando ? 'Reintentando...' : 'Reintentar conexion'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {avisoPendiente && (
+        <div className="border-b border-rose-200 bg-rose-50">
+          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.06em] text-rose-800">
+                Los cambios NO están en el servidor
+              </p>
+              <p className="mt-0.5 text-xs text-rose-700">{sincronizacion.mensaje}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleReintentarGuardado()}
+                disabled={reintentando}
+                className="rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reintentando ? 'Guardando...' : 'Reintentar guardado'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDescartarCambiosLocales()}
+                className="rounded-md border border-rose-300 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-rose-700 transition hover:border-rose-400 hover:text-rose-800"
+              >
+                Descartar cambios locales
+              </button>
+            </div>
           </div>
         </div>
       )}

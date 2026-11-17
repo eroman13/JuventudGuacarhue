@@ -10,6 +10,7 @@ Plataforma web completa para el club deportivo Juventud Guacarhue con sistema de
 - **Calendario de partidos** - Calendario completo de competiciones
 - **Resultados de partidos** - Seguimiento de resultados y estadísticas
 - **Tienda online** - E-commerce integrado
+- **Pedido rapido en tienda** - Captacion por formulario breve (nombre + WhatsApp)
 - **Sistema de abonados** - Gestión de membresías y abonos
 - **Videos/multimedia** - Galería de videos
 - **Estadísticas** - Estadísticas de jugadores y equipo
@@ -90,6 +91,10 @@ npm run dev
 ```
 
 La aplicación estará disponible en `http://localhost:5173`
+
+Opcional para mejorar conversion en tienda: define `VITE_TIENDA_WHATSAPP`
+en `frontend/.env` (solo digitos, ejemplo `56912345678`) para habilitar el
+boton de pedido rapido por WhatsApp.
 
 ## 🔐 Autenticación
 
